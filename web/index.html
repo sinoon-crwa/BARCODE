@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SINOON</title>
+<meta name="theme-color" content="#FEFBFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SINOON">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+/* 안드로이드 앱과 같은 구글(Material 3) 스타일, 남색(indigo) 기준 색 */
+:root {
+  --primary: #4355B9; --on-primary: #FFFFFF;
+  --primary-container: #DEE0FF; --on-primary-container: #00105C;
+  --secondary-container: #E1E0F9; --on-secondary-container: #191A2C;
+  --surface: #FEFBFF; --surface-low: #F7F2FA; --surface-high: #ECE6F0; --surface-highest: #E3E1EC;
+  --on-surface: #1B1B1F; --on-surface-variant: #46464F;
+  --outline: #767680; --outline-variant: #C6C5D0;
+  --error: #BA1A1A; --warn-container: #FFE0B2; --on-warn: #8A4B00;
+  --inverse-surface: #303034; --inverse-primary: #BAC3FF;
+  --nav-h: 80px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; background: var(--surface); color: var(--on-surface); }
+body {
+  font-family: Roboto, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-size: 16px; letter-spacing: .1px;
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+}
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+svg { display: block; }
+.hidden { display: none !important; }
+
+/* ---- 상단 바 ---- */
+.page { min-height: 100vh; padding-top: env(safe-area-inset-top); }
+.appbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; height: 64px; padding: 0 4px 0 16px;
+  background: var(--surface); padding-top: env(safe-area-inset-top); box-sizing: content-box; }
+.appbar h1 { flex: 1; margin: 0; font-size: 22px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--on-surface-variant); }
+.icon-btn svg { width: 24px; height: 24px; }
+.icon-btn:active { background: rgba(27,27,31,.10); }
+.icon-btn[disabled] { opacity: .38; }
+.sub { color: var(--on-surface-variant); font-size: 14px; margin: 0 16px 12px; line-height: 1.45; }
+
+/* ---- 스캔 입력 ---- */
+.scanbox { margin: 4px 16px 8px; }
+.scanrow { display: flex; gap: 8px; align-items: stretch; }
+.scanrow textarea {
+  flex: 1; resize: none; outline: 0; border: 1px solid var(--outline); border-radius: 4px; background: transparent;
+  padding: 14px 16px; font-size: 16px; height: 56px; line-height: 26px; text-transform: uppercase;
+}
+.scanrow textarea:focus { border: 2px solid var(--primary); padding: 13px 15px; }
+.scanrow textarea::placeholder { text-transform: none; color: var(--on-surface-variant); font-size: 15px; }
+.btn { background: var(--primary); color: var(--on-primary); border-radius: 20px; padding: 0 24px; font-weight: 500; font-size: 14px; letter-spacing: .1px; min-height: 40px; }
+.scanrow .btn { min-height: 56px; border-radius: 16px; }
+.btn:active { filter: brightness(1.12); }
+.btn.gray { background: var(--secondary-container); color: var(--on-secondary-container); }
+.btn.text { background: none; color: var(--primary); }
+.btn.wide { width: 100%; }
+.btn[disabled] { opacity: .38; }
+.hint { color: var(--on-surface-variant); font-size: 12px; margin: 6px 4px 0; line-height: 1.4; }
+.hint a { color: var(--primary); text-decoration: none; font-weight: 500; }
+
+/* ---- 목록 ---- */
+.sechead { color: var(--primary); font-size: 14px; font-weight: 500; margin: 16px 16px 4px; }
+.group { background: var(--surface); }
+.row { display: flex; align-items: center; gap: 16px; padding: 10px 12px 10px 16px; min-height: 72px; position: relative; width: 100%; text-align: left; border-bottom: 1px solid var(--outline-variant); }
+.row:active { background: rgba(27,27,31,.08); }
+.num { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--primary-container); color: var(--on-primary-container); font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; }
+.num.warn { background: var(--warn-container); color: var(--on-warn); }
+.num svg { width: 22px; height: 22px; }
+.main { flex: 1; min-width: 0; }
+.name { font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { font-size: 14px; color: var(--on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.meta.warn { color: var(--on-warn); }
+.pill { flex: none; background: var(--surface-highest); border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 700; }
+.pill.blue { background: var(--primary-container); color: var(--on-primary-container); }
+.pill.add { background: none; color: var(--primary); padding: 8px; font-size: 22px; font-weight: 400; line-height: 1; }
+.price { flex: none; font-size: 14px; font-weight: 500; text-align: right; }
+.chev { flex: none; color: var(--on-surface-variant); font-size: 22px; line-height: 1; }
+.empty { text-align: center; color: var(--on-surface-variant); padding: 56px 32px; line-height: 1.55; font-size: 14px; }
+.empty .big { display: flex; justify-content: center; color: var(--outline-variant); }
+.empty .big svg { width: 64px; height: 64px; }
+.empty h3 { color: var(--on-surface); font-size: 18px; font-weight: 500; margin: 12px 0 6px; }
+
+/* ---- 상품 목록 ---- */
+.search { margin: 4px 16px 8px; display: flex; align-items: center; gap: 4px; background: var(--surface-high); border-radius: 28px; padding: 0 8px 0 16px; height: 56px; }
+.search svg { width: 24px; height: 24px; color: var(--on-surface-variant); flex: none; }
+.search input { flex: 1; border: 0; outline: 0; background: transparent; padding: 10px 6px; font-size: 16px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 16px 8px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1px solid var(--outline); border-radius: 8px; padding: 6px 16px; font-size: 14px; font-weight: 500; color: var(--on-surface-variant); }
+.chip.on { background: var(--secondary-container); border-color: var(--secondary-container); color: var(--on-secondary-container); }
+.chip.on::before { content: "✓ "; }
+.count { color: var(--on-surface-variant); font-size: 12px; margin: 2px 16px 4px; }
+.more { text-align: center; color: var(--on-surface-variant); font-size: 12px; padding: 16px; }
+
+/* ---- 아래 탭(내비게이션 바) ---- */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; background: var(--surface-low);
+  padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -1px 0 rgba(0,0,0,.04); }
+.tab { flex: 1; height: var(--nav-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--on-surface-variant); font-size: 12px; font-weight: 500; }
+.tab .ind { width: 64px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center; transition: background .2s; }
+.tab svg { width: 24px; height: 24px; }
+.tab.on { color: var(--on-surface); font-weight: 700; }
+.tab.on .ind { background: var(--secondary-container); color: var(--on-secondary-container); }
+
+/* ---- 아래에서 올라오는 창 ---- */
+.dim { position: fixed; inset: 0; background: rgba(0,0,0,.32); z-index: 40; opacity: 0; transition: opacity .2s; }
+.dim.show { opacity: 1; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--surface-low); border-radius: 28px 28px 0 0;
+  max-height: 88vh; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .28s cubic-bezier(.2,0,0,1);
+  padding-bottom: env(safe-area-inset-bottom); }
+.sheet.show { transform: none; }
+.sheet .group, .sheet .row { background: transparent; }
+.grab { width: 32px; height: 4px; border-radius: 2px; background: var(--outline); opacity: .4; margin: 16px auto 8px; flex: none; }
+.sheethead { display: flex; align-items: center; padding: 0 8px 4px 24px; flex: none; }
+.sheethead h2 { flex: 1; margin: 0; font-size: 20px; font-weight: 400; line-height: 1.3; }
+.topbtn { flex: none; color: var(--primary); font-size: 14px; font-weight: 500; padding: 10px 12px; border-radius: 20px; }
+.topbtn:active { background: rgba(67,85,185,.10); }
+.sheetbody { overflow-y: auto; padding: 0 0 16px; -webkit-overflow-scrolling: touch; }
+.sheetnote { color: var(--on-surface-variant); font-size: 14px; margin: 0 24px 12px; line-height: 1.45; }
+.actions { margin: 12px 24px 0; display: flex; flex-direction: column; gap: 8px; }
+.stepper { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px auto 0; width: max-content; }
+.stepper button { width: 48px; height: 48px; border-radius: 50%; font-size: 26px; background: var(--secondary-container); color: var(--on-secondary-container); }
+.stepper span { min-width: 72px; text-align: center; font-size: 32px; font-weight: 500; }
+.field { margin: 4px 24px 0; }
+.field input { width: 100%; outline: 0; border: 1px solid var(--outline); border-radius: 4px; background: transparent; font-size: 16px; padding: 15px 16px; }
+.field input:focus { border: 2px solid var(--primary); padding: 14px 15px; }
+.switchrow { display: flex; align-items: center; gap: 12px; margin: 12px 24px 0; font-size: 15px; }
+.switch { position: relative; flex: none; order: -1; }
+.switch input { width: 20px; height: 20px; margin: 0; accent-color: var(--primary); }
+.switch i { display: none; }
+.destructive { color: var(--error) !important; }
+
+/* ---- 알림 ---- */
+.toast { position: fixed; left: 12px; right: 12px; z-index: 60; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 8px);
+  background: var(--inverse-surface); color: #F2EFF4; border-radius: 4px; padding: 6px 8px 6px 16px; min-height: 48px; display: flex; align-items: center; gap: 8px;
+  font-size: 14px; box-shadow: 0 3px 6px rgba(0,0,0,.2); transform: translateY(20px); opacity: 0; transition: all .2s; pointer-events: none; }
+.toast.show { transform: none; opacity: 1; pointer-events: auto; }
+.toast .msg { flex: 1; padding: 8px 0; }
+.toast button { color: var(--inverse-primary); font-weight: 500; font-size: 14px; padding: 10px 12px; }
+.loading { text-align: center; padding: 80px 20px; color: var(--on-surface-variant); }
+</style>
+</head>
+<body>
+
+<!-- ============ 스캔 목록 ============ -->
+<section id="page-list" class="page">
+  <header class="appbar">
+    <h1 id="list-title">스캔 목록</h1>
+    <button class="icon-btn" id="btn-save" title="이름 붙여 저장" aria-label="이름 붙여 저장"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 6h9v4H6z"/></svg></button>
+    <button class="icon-btn" id="btn-more" title="더보기" aria-label="더보기"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></button>
+  </header>
+
+  <div class="scanbox">
+    <div class="scanrow">
+      <textarea id="scan-input" rows="1" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
+        placeholder="여기를 누르고 '텍스트 스캔'"></textarea>
+      <button class="btn" id="scan-go">찾기</button>
+    </div>
+    <div class="hint">라벨 코드를 키보드의 텍스트 스캔으로 읽거나 직접 입력하세요. <a href="#" id="howto">사용법</a></div>
+  </div>
+
+  <div id="list-area"><div class="loading">상품 데이터를 불러오는 중…</div></div>
+</section>
+
+<!-- ============ 상품 목록 ============ -->
+<section id="page-catalog" class="page hidden">
+  <header class="appbar"><h1>상품 목록</h1></header>
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    <input id="cat-q" type="search" placeholder="품번 · 품명 · 바코드 검색" autocomplete="off" autocorrect="off" spellcheck="false">
+  </div>
+  <div class="chips" id="cat-chips"></div>
+  <div class="count" id="cat-count"></div>
+  <div class="group" id="cat-list"></div>
+  <div class="more" id="cat-more"></div>
+</section>
+
+<!-- ============ 보관함 ============ -->
+<section id="page-saved" class="page hidden">
+  <header class="appbar"><h1>보관함</h1></header>
+  <p class="sub">"저장"한 목록이 이 휴대폰에 남아요. 눌러서 엑셀로 받거나 보낼 수 있어요.</p>
+  <div id="saved-area"></div>
+</section>
+
+<nav class="tabbar">
+  <button class="tab on" data-page="list"><span class="ind"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm0-6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm0 12a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM7 19h14v-2H7v2zm0-6h14v-2H7v2zm0-8v2h14V5H7z"/></svg></span>스캔 목록</button>
+  <button class="tab" data-page="catalog"><span class="ind"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 18.2 13 11.75v-.91a3 3 0 1 0-4-2.84h2a1 1 0 1 1 1 1c-.55 0-1 .45-1 1v1.75L2.4 18.2A1 1 0 0 0 3 20h18a1 1 0 0 0 .6-1.8zM6 18l6-4.5 6 4.5H6z"/></svg></span>상품 목록</button>
+  <button class="tab" data-page="saved"><span class="ind"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V6h5.17l2 2H20v10z"/></svg></span>보관함</button>
+</nav>
+
+<div class="dim hidden" id="dim"></div>
+<div class="sheet hidden" id="sheet">
+  <div class="grab"></div>
+  <div class="sheethead"><h2 id="sheet-title"></h2><button class="topbtn" id="sheet-close">닫기</button></div>
+  <div class="sheetbody" id="sheet-body"></div>
+</div>
+<div class="toast" id="toast"><span class="msg" id="toast-msg"></span><button id="toast-act"></button></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   SINOON 웹 버전 (아이폰·갤럭시 공용)
+   - 글자 읽기는 휴대폰 키보드의 "텍스트 스캔"(아이폰) / "텍스트 추출"(갤럭시)에 맡기고,
+     읽힌 글자를 상품 데이터(../assets/product_barcodes.json)와 맞춰봅니다.
+   - 스캔 목록·보관함·학습 기록은 이 휴대폰(브라우저)에만 저장됩니다.
+   ===================================================================== */
+const DATA_URL = '../assets/product_barcodes.json';
+const XLSX_URLS = ['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'];
+const K_RECORDS = 'sinoon_records_v1', K_SAVED = 'sinoon_saved_v1', K_LEARNED = 'sinoon_learned_v1', K_SAVEPREF = 'sinoon_savepref_v1';
+
+const $ = (s) => document.querySelector(s);
+const ICON_SCAN = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5v4h2V5h4V3H5c-1.1 0-2 .9-2 2zm2 10H3v4c0 1.1.9 2 2 2h4v-2H5v-4zm14 4h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4zm0-16h-4v2h4v4h2V5c0-1.1-.9-2-2-2zM7 11h10v2H7z"/></svg>';
+const ICON_SEARCH = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>';
+const ICON_FOLDER = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V6h5.17l2 2H20v10z"/></svg>';
+const ICON_DOC = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8zm0 4h8v2H8z"/></svg>';
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const won = (n) => n == null ? '' : n.toLocaleString('ko-KR') + '원';
+const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (_) { return d; } };
+const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+const buzz = () => { try { navigator.vibrate && navigator.vibrate(30); } catch (_) {} };
+
+/* ---------------- 상품 데이터 & 매칭 (안드로이드 앱과 같은 방식) ---------------- */
+let PRODUCTS = [];
+const byBarcode = new Map();   // 정규화 바코드 → 상품
+const byItemNo = new Map();    // 품번(대문자) → 옵션 목록
+const itemNoByNorm = new Map(); // 정규화 품번 → [품번]
+const knownColors = new Set(), knownSizes = new Set();
+const gramIndex = new Map();
+
+// 공백/하이픈 제거 + 대문자 + OCR이 헷갈리는 글자 통일(O→0, S→5, B→8, Z→2, G→6)
+const norm = (s) => String(s).toUpperCase().replace(/[\s\-]/g, '')
+  .replace(/O/g, '0').replace(/S/g, '5').replace(/B/g, '8').replace(/Z/g, '2').replace(/G/g, '6');
+
+const SIMILAR = ['0DQ', '1IL7T', 'UV', 'MNW', 'KX', 'EF', 'C6', 'PR', 'A4', 'HN', '83'];
+const similarPairs = new Set();
+for (const g of SIMILAR) for (const a of g) for (const b of g) if (a !== b) similarPairs.add(a + b);
+
+function grams(s) {
+  const t = '^' + s + '$', out = new Set();
+  for (let i = 0; i + 3 <= t.length; i++) out.add(t.substr(i, 3));
+  return out;
+}
+
+function indexProducts(list) {
+  PRODUCTS = list.filter(p => p.barcode && p.itemNo);
+  for (const p of PRODUCTS) {
+    p.hasColor = !!p.color && p.color !== '-';
+    p.variant = [p.hasColor ? p.color : '', p.sizeLabel || ''].filter(Boolean).join(' / ');
+    byBarcode.set(norm(p.barcode), p);
+    const ik = p.itemNo.toUpperCase();
+    if (!byItemNo.has(ik)) byItemNo.set(ik, []);
+    byItemNo.get(ik).push(p);
+    const ni = norm(p.itemNo);
+    if (!itemNoByNorm.has(ni)) itemNoByNorm.set(ni, []);
+    if (!itemNoByNorm.get(ni).includes(ik)) itemNoByNorm.get(ni).push(ik);
+    if (p.hasColor) knownColors.add(norm(p.color));
+    if (p.size) knownSizes.add(norm(p.size));
+    if (p.sizeLabel) knownSizes.add(norm(p.sizeLabel));
+  }
+  for (const key of byBarcode.keys()) for (const g of grams(key)) {
+    if (!gramIndex.has(g)) gramIndex.set(g, []);
+    gramIndex.get(g).push(key);
+  }
+}
+
+function tokenize(text) {
+  const seen = new Set(), out = [];
+  for (const t of String(text).split(/[^A-Za-z0-9\-]+/)) {
+    const c = t.trim();
+    if (c && !seen.has(c.toUpperCase())) { seen.add(c.toUpperCase()); out.push(c); }
+  }
+  return out;
+}
+
+function matchCandidates(tokens) {
+  const c = new Set();
+  for (const t of tokens) { const n = norm(t); if (n.length >= 5) c.add(n); }
+  for (let i = 0; i < tokens.length; i++) {
+    let acc = tokens[i];
+    for (let span = 2; span <= 5 && i + span <= tokens.length; span++) {
+      acc += tokens[i + span - 1];
+      const n = norm(acc);
+      if (n.length >= 5 && n.length <= 24) c.add(n);
+    }
+  }
+  return c;
+}
+
+function weightedDistance(a, b, cutoff) {
+  if (a === b) return 0;
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > cutoff) return cutoff + 1;
+  let prev = Array.from({ length: lb + 1 }, (_, j) => j), curr = new Array(lb + 1).fill(0);
+  for (let i = 1; i <= la; i++) {
+    curr[0] = i; let rowMin = curr[0]; const ca = a[i - 1];
+    for (let j = 1; j <= lb; j++) {
+      const cb = b[j - 1];
+      const sub = ca === cb ? 0 : (similarPairs.has(ca + cb) ? 0.4 : 1);
+      let v = prev[j - 1] + sub;
+      if (prev[j] + 1 < v) v = prev[j] + 1;
+      if (curr[j - 1] + 1 < v) v = curr[j - 1] + 1;
+      curr[j] = v; if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > cutoff) return cutoff + 1;
+    [prev, curr] = [curr, prev];
+  }
+  return prev[lb];
+}
+
+function scoreKeysFor(cand) {
+  const scores = new Map();
+  if (cand.length < 5) return scores;
+  const counts = new Map();
+  for (const g of grams(cand)) {
+    const keys = gramIndex.get(g);
+    if (!keys || keys.length > 1500) continue;
+    for (const k of keys) counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  const shortlist = [...counts.entries()].filter(e => e[1] >= 2).sort((a, b) => b[1] - a[1]).slice(0, 40);
+  for (const [key] of shortlist) {
+    if (cand.length >= 6 && key.includes(cand)) {
+      scores.set(key, 0.5 * (1 - cand.length / key.length));
+    } else {
+      const cutoff = Math.max(1, 0.35 * key.length);
+      const d = weightedDistance(cand, key, cutoff);
+      if (d <= cutoff) scores.set(key, d / key.length);
+    }
+  }
+  return scores;
+}
+
+function suggest(tokens, limit = 6) {
+  const best = new Map();
+  for (const cand of matchCandidates(tokens)) {
+    for (const [k, s] of scoreKeysFor(cand)) if (!best.has(k) || s < best.get(k)) best.set(k, s);
+  }
+  return [...best.entries()].sort((a, b) => a[1] - b[1]).slice(0, limit).map(([k, s]) => ({ p: byBarcode.get(k), s }));
+}
+
+function matchItemNo(tok) {
+  const u = tok.toUpperCase();
+  if (byItemNo.has(u)) return u;
+  const c = itemNoByNorm.get(norm(tok));
+  return c && c.length === 1 ? c[0] : null;
+}
+
+function guessNear(tokens, center, pred) {
+  if (center >= 0) {
+    for (let i = Math.max(0, center - 4); i < Math.min(tokens.length, center + 5); i++) {
+      if (i !== center && pred(tokens[i])) return tokens[i];
+    }
+  }
+  return tokens.find(pred) || '';
+}
+
+// 결과: {type:'exact'|'learned'|'components'|'fuzzy'|'item'|'none', product, variants, suggestions}
+function analyze(text) {
+  const tokens = tokenize(text);
+  if (!tokens.length) return { type: 'none', suggestions: [], tokens };
+  const sorted = [...tokens].sort((a, b) => b.length - a.length);
+  const joined = [];
+  for (let i = 0; i < tokens.length; i++) {
+    let acc = tokens[i];
+    for (let span = 2; span <= 5 && i + span <= tokens.length; span++) { acc += tokens[i + span - 1]; joined.push(acc); }
+  }
+  for (const t of [...sorted, ...joined]) {
+    const p = byBarcode.get(norm(t));
+    if (p) return { type: 'exact', product: p, tokens };
+  }
+  const learned = load(K_LEARNED, {});
+  for (const cand of [...matchCandidates(tokens)].sort((a, b) => b.length - a.length)) {
+    const m = learned[cand];
+    if (m) { const p = byBarcode.get(norm(m.b)); if (p) return { type: 'learned', product: p, count: m.n, tokens, suggestions: suggest(tokens) }; }
+  }
+  const suggestions = suggest(tokens);
+  let itemNo = null, idx = -1;
+  for (const t of sorted) { const m = matchItemNo(t); if (m) { itemNo = m; idx = tokens.indexOf(t); break; } }
+  if (itemNo) {
+    const variants = byItemNo.get(itemNo) || [];
+    const color = guessNear(tokens, idx, t => knownColors.has(norm(t)));
+    const size = guessNear(tokens, idx, t => knownSizes.has(norm(t)));
+    if (variants.length === 1) return { type: 'components', product: variants[0], tokens, suggestions };
+    if (color || size) {
+      const v = variants.find(v => (!color || !v.hasColor || norm(v.color) === norm(color)) &&
+        (!size || norm(v.size) === norm(size) || norm(v.sizeLabel) === norm(size)));
+      if (v) return { type: 'components', product: v, tokens, suggestions };
+    }
+  }
+  if (suggestions.length) {
+    const top = suggestions[0].s, second = suggestions[1] ? suggestions[1].s : 1;
+    if (top <= 0.15 && second - top >= 0.08) return { type: 'fuzzy', product: suggestions[0].p, tokens, suggestions };
+  }
+  if (itemNo) return { type: 'item', variants: byItemNo.get(itemNo) || [], tokens, suggestions };
+  return { type: 'none', tokens, suggestions };
+}
+
+// 사용자가 고른 상품과 틀리게 읽힌 글자 짝을 기억(그 글자에서 이 상품이 확실히 1등일 때만)
+function learn(tokens, product) {
+  if (!tokens || !tokens.length) return;
+  const target = norm(product.barcode), learned = load(K_LEARNED, {});
+  let changed = false;
+  for (const cand of matchCandidates(tokens)) {
+    if (cand === target || byBarcode.has(cand)) continue;
+    const ranked = [...scoreKeysFor(cand).entries()].sort((a, b) => a[1] - b[1]);
+    if (!ranked.length || ranked[0][0] !== target) continue;
+    if (ranked.length > 1 && ranked[1][1] - ranked[0][1] < 0.05) continue;
+    const prev = learned[cand];
+    learned[cand] = { b: product.barcode, n: prev && prev.b === product.barcode ? prev.n + 1 : 1 };
+    changed = true;
+  }
+  if (changed) {
+    const keys = Object.keys(learned);
+    if (keys.length > 3000) for (const k of keys.slice(0, keys.length - 3000)) delete learned[k];
+    store(K_LEARNED, learned);
+  }
+}
+
+/* ---------------- 스캔 목록 ---------------- */
+let records = load(K_RECORDS, []); // {id, code, barcode, qty, at}
+const saveRecords = () => store(K_RECORDS, records);
+const productOf = (r) => r.barcode ? byBarcode.get(norm(r.barcode)) : null;
+
+function addProduct(product, code) {
+  const key = product ? 'P:' + product.barcode.toUpperCase() : 'C:' + code.toUpperCase();
+  const idx = records.findIndex(r => (r.barcode ? 'P:' + r.barcode.toUpperCase() : 'C:' + r.code.toUpperCase()) === key);
+  let rec, merged = false;
+  if (idx >= 0) { rec = records.splice(idx, 1)[0]; rec.qty += 1; merged = true; }
+  else rec = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code: code || (product && product.barcode) || '', barcode: product ? product.barcode : null, qty: 1, at: Date.now() };
+  records.unshift(rec);
+  saveRecords(); renderList(); buzz();
+  const nm = product ? product.name + (product.variant ? ` (${product.variant})` : '') : code;
+  toast(merged ? `${nm} · 수량 ${rec.qty}개` : `${nm} · 추가`, '되돌리기', () => {
+    const i = records.findIndex(r => r.id === rec.id);
+    if (i < 0) return;
+    if (merged && rec.qty > 1) rec.qty -= 1; else records.splice(i, 1);
+    saveRecords(); renderList();
+  });
+}
+
+function renderList() {
+  const area = $('#list-area');
+  if (!PRODUCTS.length) return;
+  const total = records.reduce((s, r) => s + r.qty, 0);
+  $('#btn-save').disabled = !records.length;
+  $('#list-title').textContent = records.length ? `스캔 ${records.length}종 · ${total}개` : '스캔 목록';
+  if (!records.length) {
+    area.innerHTML = `<div class="empty"><div class="big">${ICON_SCAN}</div><h3>아직 스캔한 상품이 없어요</h3>
+      위 칸을 누르고 키보드의 <b>텍스트 스캔</b>으로 라벨 코드를 비춰보세요.<br>같은 상품은 한 줄로 합쳐 수량이 올라가요.</div>`;
+    return;
+  }
+  const rows = records.map((r, i) => {
+    const p = productOf(r), n = records.length - i;
+    const meta = p ? esc(p.itemNo + (p.variant ? ' · ' + p.variant : '')) : esc(r.code) + ' · 상품명 미확인';
+    return `<button class="row" data-id="${r.id}">
+      <span class="num ${p ? '' : 'warn'}">${n}</span>
+      <span class="main"><div class="name">${esc(p ? p.name : '(상품명 미확인)')}</div><div class="meta ${p ? '' : 'warn'}">${meta}</div></span>
+      <span class="pill ${r.qty > 1 ? 'blue' : ''}">${r.qty}개</span></button>`;
+  }).join('');
+  area.innerHTML = `<div class="sechead">상품을 누르면 수량을 바꾸거나 지울 수 있어요</div><div class="group">${rows}</div>`;
+  area.querySelectorAll('.row').forEach(b => b.onclick = () => openRecord(b.dataset.id));
+}
+
+function openRecord(id) {
+  const r = records.find(x => x.id === id); if (!r) return;
+  const p = productOf(r);
+  let qty = r.qty;
+  openSheet(p ? p.name : '(상품명 미확인)', `
+    <p class="sheetnote">${p ? esc(p.itemNo + (p.variant ? ' · ' + p.variant : '') + ' · ' + p.barcode) + (p.price ? ' · ' + won(p.price) : '') : '인식 코드: ' + esc(r.code)}</p>
+    <div class="stepper"><button id="q-minus">−</button><span id="q-val">${qty}</span><button id="q-plus">+</button></div>
+    <div class="actions">
+      <button class="btn wide" id="q-done">완료</button>
+      ${p ? '' : '<button class="btn gray wide" id="q-link">상품 찾아서 연결</button>'}
+      <button class="btn gray wide destructive" id="q-del">삭제</button>
+    </div>`);
+  const show = () => $('#q-val').textContent = qty;
+  $('#q-minus').onclick = () => { if (qty > 1) { qty--; show(); } };
+  $('#q-plus').onclick = () => { qty++; show(); };
+  $('#q-done').onclick = () => { r.qty = qty; saveRecords(); renderList(); closeSheet(); };
+  $('#q-del').onclick = () => {
+    const i = records.indexOf(r); records.splice(i, 1); saveRecords(); renderList(); closeSheet();
+    toast('삭제했어요', '되돌리기', () => { records.splice(i, 0, r); saveRecords(); renderList(); });
+  };
+  const link = $('#q-link');
+  if (link) link.onclick = () => openSearchSheet(r.code, (prod) => {
+    r.barcode = prod.barcode; saveRecords(); renderList();
+  });
+}
+
+/* ---------------- 스캔 입력 처리 ---------------- */
+const input = $('#scan-input');
+let lastLen = 0, autoTimer = null;
+
+function handleScan(text) {
+  text = String(text || '').trim();
+  if (!text || !PRODUCTS.length) return;
+  const res = analyze(text);
+  input.value = ''; lastLen = 0;
+  if (res.type === 'exact' || (res.type === 'learned' && res.count >= 2)) { addProduct(res.product, res.product.barcode); return; }
+  showPicker(res, text);
+}
+
+input.addEventListener('input', (e) => {
+  // 텍스트 스캔/붙여넣기는 글자가 한 번에 여러 개 들어오므로, 그때는 자동으로 찾습니다.
+  // (글자를 고르는 중이거나 미리보기 중일 때는 기다립니다)
+  if (e.isComposing) return;
+  const len = input.value.length, jump = len - lastLen;
+  lastLen = len;
+  clearTimeout(autoTimer);
+  if (jump >= 4) autoTimer = setTimeout(() => handleScan(input.value), 450);
+});
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleScan(input.value); } });
+$('#scan-go').onclick = () => handleScan(input.value);
+
+function productRow(p, extra = '') {
+  return `<button class="row" data-b="${esc(p.barcode)}"><span class="main"><div class="name">${esc(p.name)}</div>
+    <div class="meta">${esc(p.itemNo + (p.variant ? ' · ' + p.variant : ''))}</div></span>${extra}<span class="pill add">＋</span></button>`;
+}
+
+function showPicker(res, rawText) {
+  const list = [], seen = new Set();
+  const push = (p) => { if (p && !seen.has(p.barcode)) { seen.add(p.barcode); list.push(p); } };
+  if (res.product) push(res.product);
+  (res.variants || []).forEach(push);
+  (res.suggestions || []).forEach(s => push(s.p));
+  const title = res.product ? '이 상품이 맞나요?' : (list.length ? '정확히 안 읽혀요. 이 중에 있나요?' : '상품을 찾지 못했어요');
+  const note = res.type === 'item' ? '품번은 읽혔어요. 색상·사이즈를 골라주세요.'
+    : res.product ? '읽힌 글자로 가장 가까운 상품을 찾았어요. 맞으면 눌러주세요.'
+    : list.length ? '라벨 글자가 일부만 읽혔어요. 맞는 상품을 누르면 바로 추가돼요.' : '다시 스캔하거나 직접 검색해보세요.';
+  openSheet(title, `<p class="sheetnote">${note}<br>읽힌 글자: <b>${esc(rawText.slice(0, 80))}</b></p>
+    ${list.length ? `<div class="group">${list.slice(0, 8).map(p => productRow(p)).join('')}</div>` : ''}
+    <div class="actions"><button class="btn gray wide" id="pk-search">직접 검색</button>
+    <button class="btn gray wide" id="pk-code">코드만 목록에 추가</button></div>`);
+  $('#sheet-body').querySelectorAll('.row').forEach(b => b.onclick = () => {
+    const p = byBarcode.get(norm(b.dataset.b));
+    learn(res.tokens, p); closeSheet(); addProduct(p, rawText);
+  });
+  $('#pk-search').onclick = () => openSearchSheet([...res.tokens].sort((a, b) => b.length - a.length)[0] || '', (p) => { learn(res.tokens, p); addProduct(p, rawText); });
+  $('#pk-code').onclick = () => { closeSheet(); addProduct(null, ([...res.tokens].sort((a, b) => b.length - a.length)[0] || rawText).toUpperCase()); };
+}
+
+/* ---------------- 상품 검색(품번→옵션 고르기) ---------------- */
+function searchItems(q, limit = 40) {
+  const toks = String(q).toUpperCase().split(/\s+/).filter(Boolean);
+  const out = [];
+  for (const [ik, vs] of byItemNo) {
+    const key = itemKey(ik, vs);
+    if (toks.every(t => key.includes(t) || key.includes(t.replace(/-/g, '')))) { out.push(vs); if (out.length >= limit) break; }
+  }
+  return out;
+}
+const itemKeys = new Map();
+function itemKey(ik, vs) {
+  let k = itemKeys.get(ik);
+  if (!k) { k = [ik, ik.replace(/-/g, ''), vs[0].name.toUpperCase(), ...vs.map(v => v.barcode.toUpperCase()), ...vs.map(v => v.barcode.toUpperCase().replace(/-/g, ''))].join(' '); itemKeys.set(ik, k); }
+  return k;
+}
+
+function openSearchSheet(initial, onPick) {
+  openSheet('상품 검색', `<div class="search" style="margin-top:0">${ICON_SEARCH}
+    <input id="ss-q" type="search" placeholder="품번 또는 품명" value="${esc(initial)}" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+    <div id="ss-res"></div>`);
+  const q = $('#ss-q'), res = $('#ss-res');
+  const run = () => {
+    const items = q.value.trim() ? searchItems(q.value.trim(), 30) : [];
+    res.innerHTML = items.length ? `<div class="group">${items.map(vs => `<button class="row" data-i="${esc(vs[0].itemNo)}">
+      <span class="main"><div class="name">${esc(vs[0].name)}</div><div class="meta">${esc(vs[0].itemNo)} · 옵션 ${vs.length}개</div></span><span class="chev">›</span></button>`).join('')}</div>`
+      : `<div class="empty" style="padding:24px">${q.value.trim() ? '검색 결과가 없어요' : '품번 일부나 품명을 입력하세요'}</div>`;
+    res.querySelectorAll('.row').forEach(b => b.onclick = () => {
+      const vs = byItemNo.get(b.dataset.i.toUpperCase());
+      if (vs.length === 1) { closeSheet(); onPick(vs[0]); return; }
+      res.innerHTML = `<p class="sheetnote" style="margin-top:8px">${esc(vs[0].name)} — 옵션을 고르세요</p><div class="group">${vs.map(v => productRow(v)).join('')}</div>`;
+      res.querySelectorAll('.row').forEach(x => x.onclick = () => { closeSheet(); onPick(byBarcode.get(norm(x.dataset.b))); });
+    });
+  };
+  q.oninput = run; run();
+}
+
+/* ---------------- 상품 목록 탭 ---------------- */
+let catCategory = null, catShown = 0, catFiltered = [];
+const shortLabel = (s) => { const i = s.indexOf('('); return (i > 0 ? s.slice(0, i) : s).trim(); };
+
+function initCatalog() {
+  const cats = [...new Set(PRODUCTS.map(p => p.category).filter(Boolean))];
+  const chips = $('#cat-chips');
+  chips.innerHTML = `<button class="chip on" data-c="">전체</button>` + cats.map(c => `<button class="chip" data-c="${esc(c)}">${esc(shortLabel(c))}</button>`).join('');
+  chips.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+    catCategory = b.dataset.c || null;
+    chips.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b));
+    runCatalog();
+  });
+  $('#cat-q').oninput = runCatalog;
+  runCatalog();
+}
+
+function runCatalog() {
+  const toks = $('#cat-q').value.toUpperCase().split(/\s+/).filter(Boolean);
+  catFiltered = [];
+  for (const [ik, vs] of byItemNo) {
+    if (catCategory && vs[0].category !== catCategory) continue;
+    const key = itemKey(ik, vs);
+    if (toks.every(t => key.includes(t) || key.includes(t.replace(/-/g, '')))) catFiltered.push(vs);
+  }
+  catFiltered.sort((a, b) => a[0].itemNo.localeCompare(b[0].itemNo));
+  const opts = catFiltered.reduce((s, vs) => s + vs.length, 0);
+  $('#cat-count').textContent = `품번 ${catFiltered.length}개 · 옵션 ${opts}개`;
+  $('#cat-list').innerHTML = ''; catShown = 0; moreCatalog(); window.scrollTo(0, 0);
+}
+
+function moreCatalog() {
+  const next = catFiltered.slice(catShown, catShown + 60);
+  if (!next.length) { $('#cat-more').textContent = catFiltered.length ? '' : '조건에 맞는 상품이 없어요.'; return; }
+  const html = next.map(vs => {
+    const colors = [...new Set(vs.filter(v => v.hasColor).map(v => v.color))];
+    const sizes = [...new Set(vs.map(v => v.sizeLabel || v.size).filter(Boolean))];
+    const opt = [colors.length ? '색상 ' + colors.join(', ') : '', sizes.length ? '사이즈 ' + sizes.join(', ') : ''].filter(Boolean).join(' · ');
+    return `<button class="row" data-i="${esc(vs[0].itemNo)}"><span class="main"><div class="name">${esc(vs[0].name)}</div>
+      <div class="meta">${esc(vs[0].itemNo)} · ${esc(shortLabel(vs[0].category))}</div><div class="meta">${esc(opt)}</div></span>
+      <span class="price">${won(vs[0].price)}</span><span class="chev">›</span></button>`;
+  }).join('');
+  $('#cat-list').insertAdjacentHTML('beforeend', html);
+  catShown += next.length;
+  $('#cat-list').querySelectorAll('.row:not([data-bound])').forEach(b => { b.dataset.bound = 1; b.onclick = () => openItem(b.dataset.i); });
+  $('#cat-more').textContent = catShown < catFiltered.length ? '아래로 내리면 더 보여요' : '';
+}
+
+window.addEventListener('scroll', () => {
+  if (!$('#page-catalog').classList.contains('hidden') && innerHeight + scrollY > document.body.scrollHeight - 600) moreCatalog();
+}, { passive: true });
+
+function openItem(itemNo) {
+  const vs = byItemNo.get(itemNo.toUpperCase()); if (!vs) return;
+  const p = vs[0];
+  const inList = (v) => records.filter(r => r.barcode && r.barcode.toUpperCase() === v.barcode.toUpperCase()).reduce((s, r) => s + r.qty, 0);
+  const render = (keep) => {
+    openSheet(p.name, `<p class="sheetnote">${esc(p.itemNo)} · ${esc(shortLabel(p.category))} · ${esc(shortLabel(p.gender || ''))}${p.price ? ' · 판매가 ' + won(p.price) : ''}${p.tagPrice && p.tagPrice !== p.price ? ' · 택가 ' + won(p.tagPrice) : ''}<br>＋를 누르면 스캔 목록에 바로 담겨요(택 없는 상품 수기 추가용).</p>
+      <div class="group">${vs.map(v => productRow(v, inList(v) ? `<span class="pill">목록 ${inList(v)}개</span>` : '')).join('')}</div>`, keep);
+    $('#sheet-body').querySelectorAll('.row').forEach(b => b.onclick = () => { addProduct(byBarcode.get(norm(b.dataset.b)), b.dataset.b); render(true); });
+  };
+  render();
+}
+
+/* ---------------- 저장 / 보관함 ---------------- */
+let saved = load(K_SAVED, []); // [{id, name, at, rows:[...]}]
+const pad2 = (n) => String(n).padStart(2, '0');
+const fmtDate = (t) => { const d = new Date(t); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; };
+const dateName = () => { const d = new Date(); return `${d.getMonth() + 1}월 ${d.getDate()}일 스캔`; };
+
+function suggestName() {
+  const pref = load(K_SAVEPREF, {});
+  const last = (pref.last || '').trim();
+  if (!last || pref.wasDefault) return dateName();
+  const ms = [...last.matchAll(/\d+/g)];
+  if (!ms.length) return dateName();
+  const m = ms[ms.length - 1];
+  return last.slice(0, m.index) + (parseInt(m[0], 10) + 1) + last.slice(m.index + m[0].length);
+}
+
+function snapshotRows() {
+  return [...records].reverse().map((r, i) => {
+    const p = productOf(r);
+    return { no: i + 1, itemNo: p ? p.itemNo : '', name: p ? p.name : '', color: p ? p.color : '', size: p ? p.sizeLabel : '',
+      qty: r.qty, code: r.code, matched: p ? 'O' : 'X', at: fmtDate(r.at), barcode: r.barcode || '' };
+  });
+}
+
+$('#btn-save').onclick = () => {
+  if (!records.length) return;
+  const pref = load(K_SAVEPREF, {}), total = records.reduce((s, r) => s + r.qty, 0);
+  openSheet('이름 붙여 저장', `<p class="sheetnote">${records.length}종 · ${total}개를 보관함에 저장해요. 엑셀로 받거나 보내는 건 보관함에서 할 수 있어요.</p>
+    <div class="field"><input id="sv-name" value="${esc(suggestName())}" placeholder="예: 1번 박스, 10월 입고분"></div>
+    <label class="switchrow"><span>저장 후 목록 비우기</span><span class="switch"><input type="checkbox" id="sv-clear" ${pref.clear === false ? '' : 'checked'}><i></i></span></label>
+    <div class="actions"><button class="btn wide" id="sv-ok">저장</button><button class="btn gray wide" id="sv-ok-xlsx">저장하고 엑셀 받기</button></div>`);
+  const nameEl = $('#sv-name'); setTimeout(() => { nameEl.focus(); nameEl.select(); }, 300);
+  const doSave = (andExport) => {
+    const name = nameEl.value.trim(); if (!name) { nameEl.focus(); return; }
+    const clear = $('#sv-clear').checked;
+    const entry = { id: Date.now().toString(36), name, at: Date.now(), rows: snapshotRows() };
+    saved.unshift(entry); store(K_SAVED, saved);
+    store(K_SAVEPREF, { last: name, wasDefault: name === dateName(), clear });
+    if (clear) { records = []; saveRecords(); renderList(); }
+    closeSheet(); renderSaved();
+    toast(`'${name}' 보관함에 저장했어요`, '엑셀 받기', () => exportEntry(entry));
+    if (andExport) exportEntry(entry);
+  };
+  $('#sv-ok').onclick = () => doSave(false);
+  $('#sv-ok-xlsx').onclick = () => doSave(true);
+};
+
+let xlsxPromise = null;
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  // 엑셀 도구는 처음 한 번만 인터넷에서 받아오고, 그 뒤로는 휴대폰에 보관된 것을 씁니다.
+  if (!xlsxPromise) xlsxPromise = new Promise((ok, bad) => {
+    const tryAt = (i) => {
+      if (i >= XLSX_URLS.length) { xlsxPromise = null; bad(new Error('엑셀 도구를 불러오지 못했어요(인터넷 연결 확인)')); return; }
+      const s = document.createElement('script'); s.src = XLSX_URLS[i];
+      s.onload = () => ok(window.XLSX);
+      s.onerror = () => { s.remove(); tryAt(i + 1); };
+      document.head.appendChild(s);
+    };
+    tryAt(0);
+  });
+  return xlsxPromise;
+}
+
+async function exportEntry(entry) {
+  try {
+    const XLSX = await loadXlsx();
+    const head = ['번호', '품번', '품명', '색상', '사이즈', '수량', '인식코드', '매칭여부', '인식일시', '바코드'];
+    const rows = entry.rows.map(r => [r.no, r.itemNo, r.name, r.color, r.size, r.qty, r.code, r.matched, r.at, r.barcode]);
+    const total = entry.rows.reduce((s, r) => s + r.qty, 0);
+    rows.push(['합계', '', `${entry.rows.length}종`, '', '', total]);
+    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
+    ws['!cols'] = [{ wch: 5 }, { wch: 16 }, { wch: 30 }, { wch: 6 }, { wch: 8 }, { wch: 6 }, { wch: 18 }, { wch: 8 }, { wch: 20 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '스캔목록');
+    const fname = entry.name.replace(/[\\/:*?"<>|]/g, ' ').trim() + '.xlsx';
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const file = new File([buf], fname, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: entry.name }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = fname;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  } catch (e) { toast(e.message || '엑셀을 만들지 못했어요'); }
+}
+
+function renderSaved() {
+  const area = $('#saved-area');
+  if (!saved.length) { area.innerHTML = `<div class="empty"><div class="big">${ICON_FOLDER}</div><h3>저장한 목록이 없어요</h3>스캔 목록에서 "저장"을 누르면 여기에 모여요.</div>`; return; }
+  area.innerHTML = `<div class="group">${saved.map(e => {
+    const total = e.rows.reduce((s, r) => s + r.qty, 0);
+    return `<button class="row" data-s="${e.id}"><span class="num">${ICON_DOC}</span>
+      <span class="main"><div class="name">${esc(e.name)}</div><div class="meta">${fmtDate(e.at).slice(0, 16)} · ${e.rows.length}종 ${total}개</div></span><span class="chev">›</span></button>`;
+  }).join('')}</div>`;
+  area.querySelectorAll('.row').forEach(b => b.onclick = () => openSaved(b.dataset.s));
+}
+
+function openSaved(id) {
+  const e = saved.find(x => x.id === id); if (!e) return;
+  const total = e.rows.reduce((s, r) => s + r.qty, 0);
+  openSheet(e.name, `<p class="sheetnote">${fmtDate(e.at).slice(0, 16)} · ${e.rows.length}종 ${total}개</p>
+    <div class="actions"><button class="btn wide" id="sd-x">엑셀로 받기 / 보내기</button>
+    <button class="btn gray wide" id="sd-load">스캔 목록으로 다시 불러오기</button>
+    <button class="btn gray wide" id="sd-rn">이름 바꾸기</button>
+    <button class="btn gray wide destructive" id="sd-del">삭제</button></div>
+    <div class="sechead">내용</div>
+    <div class="group">${e.rows.map(r => `<div class="row"><span class="main"><div class="name">${esc(r.name || '(상품명 미확인)')}</div>
+      <div class="meta">${esc(r.itemNo ? r.itemNo + (r.color && r.color !== '-' ? ' · ' + r.color : '') + (r.size ? ' · ' + r.size : '') : r.code)}</div></span><span class="pill">${r.qty}개</span></div>`).join('')}</div>`);
+  $('#sd-x').onclick = () => exportEntry(e);
+  $('#sd-load').onclick = () => {
+    if (records.length && !confirm('지금 스캔 목록에 더해서 불러올까요?')) return;
+    for (const r of e.rows.slice().reverse()) {
+      const p = r.barcode ? byBarcode.get(norm(r.barcode)) : null;
+      for (let i = 0; i < r.qty; i++) addProductSilent(p, r.code);
+    }
+    saveRecords(); renderList(); closeSheet(); switchPage('list'); toast(`'${e.name}'을 불러왔어요`);
+  };
+  $('#sd-rn').onclick = () => { const n = prompt('새 이름', e.name); if (n && n.trim()) { e.name = n.trim(); store(K_SAVED, saved); renderSaved(); closeSheet(); } };
+  $('#sd-del').onclick = () => { if (!confirm(`'${e.name}'을 지울까요?`)) return; saved = saved.filter(x => x !== e); store(K_SAVED, saved); renderSaved(); closeSheet(); };
+}
+
+function addProductSilent(product, code) {
+  const key = product ? 'P:' + product.barcode.toUpperCase() : 'C:' + String(code).toUpperCase();
+  const r = records.find(x => (x.barcode ? 'P:' + x.barcode.toUpperCase() : 'C:' + x.code.toUpperCase()) === key);
+  if (r) r.qty += 1;
+  else records.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code: code || (product && product.barcode) || '', barcode: product ? product.barcode : null, qty: 1, at: Date.now() });
+}
+
+/* ---------------- 더보기 / 사용법 ---------------- */
+$('#btn-more').onclick = () => {
+  const learnedN = Object.keys(load(K_LEARNED, {})).length;
+  openSheet('더보기', `<div class="actions">
+    <button class="btn gray wide" id="m-how">사용법 보기</button>
+    <button class="btn gray wide" id="m-learn">인식 학습 기록 지우기 (${learnedN}건)</button>
+    <button class="btn gray wide destructive" id="m-clear" ${records.length ? '' : 'disabled'}>스캔 목록 전체 삭제</button></div>`);
+  $('#m-how').onclick = showHowTo;
+  $('#m-learn').onclick = () => { if (confirm('틀리게 읽힌 라벨을 바로잡아준 기록을 모두 지울까요?')) { store(K_LEARNED, {}); closeSheet(); toast('학습 기록을 지웠어요'); } };
+  $('#m-clear').onclick = () => {
+    if (!confirm(`스캔 목록 ${records.length}건을 모두 지울까요?`)) return;
+    const backup = records; records = []; saveRecords(); renderList(); closeSheet();
+    toast('전체 삭제했어요', '되돌리기', () => { records = backup; saveRecords(); renderList(); });
+  };
+};
+
+function showHowTo() {
+  openSheet('사용법', `<div style="padding:4px 24px 8px;line-height:1.65;font-size:15px">
+    <b>아이폰</b><br>① 위의 입력 칸을 누릅니다.<br>② 키보드 위에 뜨는 <b>텍스트 스캔</b> 아이콘(네모 안 글줄)을 누르거나, 칸을 한 번 더 눌러 <b>텍스트 스캔</b>을 고릅니다.<br>③ 라벨의 코드를 노란 틀 안에 비추고 <b>입력</b>을 누르면 자동으로 찾아요.<br><br>
+    <b>갤럭시</b><br>① 입력 칸을 누릅니다.<br>② 삼성 키보드 위쪽 도구 모음의 <b>텍스트 추출</b>(또는 ··· 안에 있음)을 누르고 라벨을 비춥니다.<br>③ 코드가 들어가면 자동으로 찾아요.<br>도구가 안 보이면 카메라 앱으로 라벨을 찍어 글자를 복사해 붙여넣어도 돼요.<br><br>
+    <b>홈 화면에 추가</b><br>아이폰: 사파리 아래 공유 버튼 → 홈 화면에 추가<br>갤럭시: 크롬/삼성 인터넷 메뉴 → 홈 화면에 추가<br>한 번 열어둔 뒤에는 인터넷 없이도 열려요.<br><br>
+    스캔 목록·보관함은 이 휴대폰 안에만 저장돼요. 브라우저 기록/데이터를 지우면 같이 지워지니 중요한 목록은 엑셀로 받아두세요.</div>`);
+}
+$('#howto').onclick = (e) => { e.preventDefault(); showHowTo(); };
+
+/* ---------------- 공통: 시트 / 알림 / 탭 ---------------- */
+function openSheet(title, html, keepToast = false) {
+  if (!keepToast) $('#toast').classList.remove('show');
+  $('#sheet-title').textContent = title; $('#sheet-body').innerHTML = html; $('#sheet-body').scrollTop = 0;
+  const dim = $('#dim'), sh = $('#sheet');
+  dim.classList.remove('hidden'); sh.classList.remove('hidden');
+  requestAnimationFrame(() => { dim.classList.add('show'); sh.classList.add('show'); });
+}
+function closeSheet() {
+  const dim = $('#dim'), sh = $('#sheet');
+  dim.classList.remove('show'); sh.classList.remove('show');
+  setTimeout(() => { if (!sh.classList.contains('show')) { dim.classList.add('hidden'); sh.classList.add('hidden'); } }, 280);
+}
+$('#dim').onclick = closeSheet; $('#sheet-close').onclick = closeSheet;
+
+let toastTimer = null;
+function toast(msg, actLabel, act) {
+  const t = $('#toast'); $('#toast-msg').textContent = msg;
+  const b = $('#toast-act'); b.textContent = actLabel || ''; b.style.display = actLabel ? '' : 'none';
+  b.onclick = () => { t.classList.remove('show'); act && act(); };
+  t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+function switchPage(name) {
+  for (const p of ['list', 'catalog', 'saved']) $('#page-' + p).classList.toggle('hidden', p !== name);
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.page === name));
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchPage(t.dataset.page));
+
+/* ---------------- 시작 ---------------- */
+(async function start() {
+  try {
+    const res = await fetch(DATA_URL, { cache: 'no-cache' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    indexProducts(await res.json());
+  } catch (e) {
+    $('#list-area').innerHTML = `<div class="empty"><h3>상품 데이터를 불러오지 못했어요</h3>인터넷 연결을 확인하고 다시 열어주세요.<br><small>${esc(e.message)}</small></div>`;
+    return;
+  }
+  renderList(); initCatalog(); renderSaved();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
