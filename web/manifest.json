@@ -1,0 +1,13 @@
+{
+  "name": "SINOON 케어라벨 스캔",
+  "short_name": "SINOON",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FEFBFF",
+  "theme_color": "#FEFBFF",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
