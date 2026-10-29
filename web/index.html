@@ -148,6 +148,11 @@ svg { display: block; }
 .loading { text-align: center; padding: 80px 20px; color: var(--on-surface-variant); }
 
 /* ---- 카메라 스캔 ---- */
+.dlbox { margin: 4px 24px 0; }
+.dlbar { height: 8px; border-radius: 4px; background: var(--surface-highest); overflow: hidden; }
+.dlbar i { display: block; height: 100%; width: 0; background: var(--primary); border-radius: 4px; transition: width .2s; }
+.dltxt { display: flex; justify-content: space-between; font-size: 13px; color: var(--on-surface-variant); margin-top: 8px; }
+.dlok { display: flex; align-items: center; gap: 10px; margin: 4px 24px 0; font-size: 15px; font-weight: 500; color: #1B5E20; }
 .fab { position: fixed; right: 16px; z-index: 15; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px);
   display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px 0 16px; border-radius: 16px;
   background: var(--primary-container); color: var(--on-primary-container); font-size: 15px; font-weight: 500;
@@ -218,7 +223,7 @@ svg { display: block; }
 <section id="page-catalog" class="page hidden">
   <header class="appbar"><h1>상품 목록</h1></header>
   <div class="search">
-    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.090-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
     <input id="cat-q" type="search" placeholder="품번 · 품명 · 바코드 검색" autocomplete="off" autocorrect="off" spellcheck="false">
   </div>
   <div class="chips" id="cat-chips"></div>
@@ -251,7 +256,7 @@ svg { display: block; }
     <button class="icon-btn hidden" id="cam-torch" aria-label="플래시"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2v11h3v9l7-12h-4l4-8z"/></svg></button>
   </div>
   <div class="tip" id="cam-tip">품번·색상·사이즈가 틀 안에 들어오게 비추고<br>아래 버튼을 누르세요</div>
-  <div class="prog hidden" id="cam-prog"><div id="cam-prog-msg"></div><div class="bar"><i id="cam-prog-bar"></i></div></div>
+  <div class="prog hidden" id="cam-prog"><div id="cam-prog-msg"></div></div>
   <div class="bottom">
     <div class="result hidden" id="cam-result"></div>
     <button class="shutter" id="cam-shot" aria-label="찍기" disabled><span></span></button>
@@ -962,13 +967,15 @@ function addProductSilent(product, code) {
 let camOpen = false, camStream = null, camBusy = false, camTorch = false, camZoomed = false;
 const camVideo = $('#cam-video');
 
+let ocrScript = null;
 function loadOcr() {
-  if (window.OCR) return Promise.resolve();
-  return new Promise((ok, bad) => {
+  if (typeof OCR !== 'undefined') return Promise.resolve();
+  if (!ocrScript) ocrScript = new Promise((ok, bad) => {
     const s = document.createElement('script'); s.src = 'ocr.js';
-    s.onload = ok; s.onerror = () => { s.remove(); bad(new Error('인식 도구를 불러오지 못했어요(인터넷 연결 확인)')); };
+    s.onload = ok; s.onerror = () => { s.remove(); ocrScript = null; bad(new Error('인식 도구를 불러오지 못했어요(인터넷 연결 확인)')); };
     document.head.appendChild(s);
   });
+  return ocrScript;
 }
 
 function camLayout() {
@@ -980,15 +987,78 @@ function camLayout() {
   $('#cam-tip').style.top = (top + h + 16) + 'px';
 }
 
+/* 인식 도구 받기: 카메라를 켜기 전에 따로 받고, 다 받아야 카메라가 켜집니다. */
+let ocrDownloading = null;            // 받는 중인 작업(창을 닫아도 계속 받음)
+let ocrDlState = { got: 0, total: 0, err: '' };
+const mb = (n) => (n / 1048576).toFixed(1);
+
+async function ocrDownloaded() {
+  await loadOcr();
+  return OCR.isReady() || await OCR.isDownloaded();
+}
+
+function startOcrDownload() {
+  if (ocrDownloading) return ocrDownloading;
+  ocrDlState = { got: 0, total: OCR.TOTAL, err: '' };
+  const onProg = (g, t) => { ocrDlState.got = g; ocrDlState.total = t; paintOcrSetup(); };
+  ocrDownloading = (OCR.canStore ? OCR.download(onProg) : OCR.init((g, t) => onProg(g, t)))
+    .then(() => { ocrDownloading = null; paintOcrSetup(); warmOcr(); if (!$('#dl-wrap') || !$('#sheet').classList.contains('show')) toast('카메라 인식 도구를 다 받았어요', '카메라 켜기', openCamera); })
+    .catch((e) => {
+      ocrDownloading = null;
+      ocrDlState.err = (e && e.name === 'QuotaExceededError') ? '휴대폰 저장 공간이 부족해요. 공간을 비우고 다시 받아주세요.' : '받다가 끊겼어요. 인터넷 연결을 확인하고 다시 눌러주세요. (받은 부분은 이어서 받아요)';
+      paintOcrSetup();
+    });
+  paintOcrSetup();
+  return ocrDownloading;
+}
+
+async function paintOcrSetup() {
+  const wrap = $('#dl-wrap'); if (!wrap) return;
+  const done = !ocrDownloading && !ocrDlState.err && await ocrDownloaded();
+  if (done) {
+    wrap.innerHTML = `<div class="dlok">✓ 준비 완료! 이제 카메라로 스캔할 수 있어요.</div>
+      <div class="actions"><button class="btn wide" id="dl-cam">카메라 켜기</button></div>`;
+    $('#dl-cam').onclick = () => { closeSheet(); openCamera(); };
+    return;
+  }
+  const pct = ocrDlState.total ? Math.floor(ocrDlState.got / ocrDlState.total * 100) : 0;
+  if (ocrDownloading) {
+    wrap.innerHTML = `<div class="dlbox"><div class="dlbar"><i style="width:${pct}%"></i></div>
+      <div class="dltxt"><span>받는 중… ${pct}%</span><span>${mb(ocrDlState.got)} / ${mb(ocrDlState.total)}MB</span></div></div>
+      <p class="sheetnote" style="margin-top:12px">이 창을 닫아도 계속 받아요. 다 받으면 알려드릴게요.</p>`;
+    return;
+  }
+  wrap.innerHTML = `${ocrDlState.err ? `<p class="sheetnote" style="color:var(--error)">${esc(ocrDlState.err)}</p>` : ''}
+    <div class="actions"><button class="btn wide" id="dl-go">받기 (약 ${Math.round(OCR.TOTAL / 1048576)}MB)</button></div>`;
+  $('#dl-go').onclick = startOcrDownload;
+}
+
+function showOcrSetup() {
+  openSheet('카메라 스캔 준비', `<p class="sheetnote">카메라로 라벨 글자를 읽으려면 <b>글자 인식 도구</b>를 한 번 받아야 해요.<br>
+    · 처음 한 번만 받고, 그 뒤로는 휴대폰에 저장돼서 다시 받지 않아요.<br>
+    · 와이파이에서 받는 걸 권장해요.<br>
+    · 사진은 휴대폰 밖으로 보내지 않아요.</p><div id="dl-wrap"></div>`);
+  paintOcrSetup();
+}
+
+// 다 받아둔 경우, 앱을 열 때 미리 켜둬서 카메라를 누르면 바로 찍을 수 있게 합니다.
+function warmOcr() {
+  loadOcr().then(() => OCR.isDownloaded()).then((ok) => { if (ok && !OCR.isReady()) return OCR.init(); }).catch(() => {});
+}
+
 async function openCamera() {
   if (!PRODUCTS.length) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     toast('이 브라우저에서는 카메라를 쓸 수 없어요. 사파리/크롬에서 열어주세요.'); return;
   }
+  try {
+    if (ocrDownloading || !(await ocrDownloaded())) { showOcrSetup(); return; }
+  } catch (e) { toast('인식 도구를 불러오지 못했어요. 인터넷 연결을 확인해주세요.'); return; }
   camOpen = true; closeSheet();
   $('#cam').classList.remove('hidden'); camLayout();
   $('#cam-result').classList.add('hidden');
-  $('#cam-shot').disabled = true;
+  $('#cam-shot').disabled = !OCR.isReady();
+  const prog = $('#cam-prog'), msg = $('#cam-prog-msg');
   try {
     camStream = await navigator.mediaDevices.getUserMedia({ audio: false,
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
@@ -1002,20 +1072,14 @@ async function openCamera() {
     toast(denied ? '카메라 권한이 꺼져 있어요. 브라우저 설정에서 이 사이트의 카메라를 허용해주세요.' : '카메라를 켜지 못했어요: ' + (e.message || e.name));
     return;
   }
-  // 인식 도구 준비(처음 한 번은 약 27MB를 받아요)
-  const prog = $('#cam-prog'), bar = $('#cam-prog-bar'), msg = $('#cam-prog-msg');
-  try {
-    await loadOcr();
-    if (!OCR.isReady()) {
-      prog.classList.remove('hidden'); msg.innerHTML = '글자 인식 도구 준비 중…<br><small>처음 한 번만 약 27MB를 받아요(와이파이 권장)</small>';
-      await OCR.init((f) => { bar.style.width = Math.round(f * 100) + '%'; });
-    }
+  // 이미 받아둔 도구를 켜기(몇 초 걸릴 수 있음, 인터넷 필요 없음)
+  if (!OCR.isReady()) {
+    prog.classList.remove('hidden'); msg.innerHTML = '인식 준비 중…';
+    try { await OCR.init(); }
+    catch (e) { msg.innerHTML = '인식 도구를 켜지 못했어요.<br><small>더보기 → 카메라 인식 도구에서 다시 받아주세요.</small>'; return; }
     prog.classList.add('hidden');
-    if (camOpen) $('#cam-shot').disabled = false;
-  } catch (e) {
-    prog.classList.remove('hidden');
-    msg.innerHTML = '인식 도구를 받지 못했어요.<br><small>인터넷 연결을 확인하고 다시 열어주세요.</small>';
   }
+  if (camOpen) $('#cam-shot').disabled = false;
 }
 
 function setupCamControls() {
@@ -1151,9 +1215,22 @@ $('#btn-more').onclick = () => {
   const learnedN = Object.keys(load(K_LEARNED, {})).length;
   openSheet('더보기', `<div class="actions">
     <button class="btn gray wide" id="m-how">사용법 보기</button>
+    <button class="btn gray wide" id="m-ocr">카메라 인식 도구 확인 중…</button>
     <button class="btn gray wide" id="m-learn">인식 학습 기록 지우기 (${learnedN}건)</button>
     <button class="btn gray wide destructive" id="m-clear" ${records.length ? '' : 'disabled'}>스캔 목록 전체 삭제</button></div>`);
   $('#m-how').onclick = showHowTo;
+  const mo = $('#m-ocr');
+  ocrDownloaded().then((ok) => {
+    if (!mo.isConnected) return;
+    if (ocrDownloading) { mo.textContent = '카메라 인식 도구 받는 중…'; mo.onclick = showOcrSetup; }
+    else if (ok) {
+      mo.textContent = `카메라 인식 도구: 받음 · 지우기 (${Math.round(OCR.TOTAL / 1048576)}MB 확보)`;
+      mo.onclick = async () => {
+        if (!confirm('카메라 인식 도구를 지울까요? 다시 쓰려면 새로 받아야 해요.')) return;
+        await OCR.remove(); closeSheet(); toast('인식 도구를 지웠어요. (앱을 다시 열면 완전히 정리돼요)');
+      };
+    } else { mo.textContent = `카메라 인식 도구 받기 (약 ${Math.round(OCR.TOTAL / 1048576)}MB)`; mo.onclick = showOcrSetup; }
+  }).catch(() => { if (mo.isConnected) mo.textContent = '카메라 인식 도구를 확인하지 못했어요'; });
   $('#m-learn').onclick = () => { if (confirm('틀리게 읽힌 라벨을 바로잡아준 기록을 모두 지울까요?')) { store(K_LEARNED, {}); closeSheet(); toast('학습 기록을 지웠어요'); } };
   $('#m-clear').onclick = () => {
     if (!confirm(`스캔 목록 ${records.length}건을 모두 지울까요?`)) return;
@@ -1164,7 +1241,7 @@ $('#btn-more').onclick = () => {
 
 function showHowTo() {
   openSheet('사용법', `<div style="padding:4px 24px 8px;line-height:1.65;font-size:15px">
-    <b>카메라 스캔(추천)</b><br>① 오른쪽 아래 <b>카메라 스캔</b>을 누르고 카메라를 허용합니다.<br>② 라벨의 품번·색상·사이즈가 흰 틀 안에 들어오게 비추고 동그란 버튼을 누릅니다.<br>③ 정확히 읽히면 바로 목록에 담기고, 헷갈리면 고를 수 있는 창이 떠요. 카메라는 켜진 채로 다음 라벨을 찍으면 돼요.<br>처음 한 번은 글자 인식 도구(약 27MB)를 받아요. 사진은 휴대폰 밖으로 보내지 않아요.<br><br>
+    <b>카메라 스캔(추천)</b><br>① 오른쪽 아래 <b>카메라 스캔</b>을 누릅니다. 처음 한 번은 <b>받기</b>를 눌러 글자 인식 도구(약 26MB)를 받고, 다 받으면 <b>카메라 켜기</b>를 누른 뒤 카메라를 허용합니다.<br>② 라벨의 품번·색상·사이즈가 흰 틀 안에 들어오게 비추고 동그란 버튼을 누릅니다.<br>③ 정확히 읽히면 바로 목록에 담기고, 헷갈리면 고를 수 있는 창이 떠요. 카메라는 켜진 채로 다음 라벨을 찍으면 돼요.<br>받은 도구는 휴대폰에 저장돼서 다시 받지 않아요(더보기에서 확인·삭제). 사진은 휴대폰 밖으로 보내지 않아요.<br><br>
     <b>키보드 텍스트 스캔</b><br><b>아이폰</b><br>① 위의 입력 칸을 누릅니다.<br>② 키보드 위에 뜨는 <b>텍스트 스캔</b> 아이콘(네모 안 글줄)을 누르거나, 칸을 한 번 더 눌러 <b>텍스트 스캔</b>을 고릅니다.<br>③ 라벨의 코드를 노란 틀 안에 비추고 <b>입력</b>을 누르면 자동으로 찾아요.<br><br>
     <b>갤럭시</b><br>① 입력 칸을 누릅니다.<br>② 삼성 키보드 위쪽 도구 모음의 <b>텍스트 추출</b>(또는 ··· 안에 있음)을 누르고 라벨을 비춥니다.<br>③ 코드가 들어가면 자동으로 찾아요.<br>도구가 안 보이면 카메라 앱으로 라벨을 찍어 글자를 복사해 붙여넣어도 돼요.<br><br>
     <b>홈 화면에 추가</b><br>아이폰: 사파리 아래 공유 버튼 → 홈 화면에 추가<br>갤럭시: 크롬/삼성 인터넷 메뉴 → 홈 화면에 추가<br>한 번 열어둔 뒤에는 인터넷 없이도 열려요.<br><br>
@@ -1213,6 +1290,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchPage(t.da
     return;
   }
   renderList(); initCatalog(); renderSaved();
+  setTimeout(warmOcr, 1500);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
