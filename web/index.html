@@ -146,6 +146,48 @@ svg { display: block; }
 .toast .msg { flex: 1; padding: 8px 0; }
 .toast button { color: var(--inverse-primary); font-weight: 500; font-size: 14px; padding: 10px 12px; }
 .loading { text-align: center; padding: 80px 20px; color: var(--on-surface-variant); }
+
+/* ---- 카메라 스캔 ---- */
+.fab { position: fixed; right: 16px; z-index: 15; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px);
+  display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px 0 16px; border-radius: 16px;
+  background: var(--primary-container); color: var(--on-primary-container); font-size: 15px; font-weight: 500;
+  box-shadow: 0 3px 5px rgba(0,0,0,.18), 0 1px 10px rgba(0,0,0,.12); }
+.fab svg { width: 24px; height: 24px; }
+.fab:active { filter: brightness(.95); }
+.cam { position: fixed; inset: 0; z-index: 35; background: #000; color: #fff; overflow: hidden; touch-action: none; }
+.cam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cam .shade { position: absolute; border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,.45); pointer-events: none; }
+.cam .shade i { position: absolute; width: 28px; height: 28px; border: 4px solid #fff; }
+.cam .shade i:nth-child(1) { left: -2px; top: -2px; border-right: 0; border-bottom: 0; border-radius: 16px 0 0 0; }
+.cam .shade i:nth-child(2) { right: -2px; top: -2px; border-left: 0; border-bottom: 0; border-radius: 0 16px 0 0; }
+.cam .shade i:nth-child(3) { left: -2px; bottom: -2px; border-right: 0; border-top: 0; border-radius: 0 0 0 16px; }
+.cam .shade i:nth-child(4) { right: -2px; bottom: -2px; border-left: 0; border-top: 0; border-radius: 0 0 16px 0; }
+.cam .shade.busy { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+.cam .top { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 4px; padding: calc(env(safe-area-inset-top) + 8px) 8px 8px; }
+.cam .top .icon-btn { color: #fff; background: rgba(0,0,0,.35); }
+.cam .top .icon-btn.on { background: #FFD54F; color: #000; }
+.cam .top .grow { flex: 1; }
+.cam .chipbtn { height: 40px; padding: 0 14px; border-radius: 20px; background: rgba(0,0,0,.35); color: #fff; font-size: 14px; font-weight: 500; }
+.cam .chipbtn.on { background: #fff; color: #000; }
+.cam .tip { position: absolute; left: 16px; right: 16px; text-align: center; font-size: 14px; line-height: 1.45; text-shadow: 0 1px 3px rgba(0,0,0,.8); pointer-events: none; }
+.cam .bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(env(safe-area-inset-bottom) + 20px); display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.cam .result { width: 100%; max-width: 520px; background: rgba(32,32,36,.92); border-radius: 16px; padding: 10px 8px 10px 16px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.cam .result.ok { background: rgba(27,94,32,.94); }
+.cam .result.warn { background: rgba(138,75,0,.94); }
+.cam .result .txt { flex: 1; min-width: 0; line-height: 1.4; }
+.cam .result .txt b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cam .result button { flex: none; color: #fff; font-weight: 500; padding: 10px 12px; border-radius: 20px; }
+.cam .result button.x { font-size: 20px; padding: 6px 10px; opacity: .8; }
+.shutter { width: 76px; height: 76px; border-radius: 50%; border: 4px solid #fff; background: rgba(255,255,255,.25); display: flex; align-items: center; justify-content: center; }
+.shutter span { width: 60px; height: 60px; border-radius: 50%; background: #fff; transition: transform .1s; }
+.shutter:active span { transform: scale(.9); }
+.shutter[disabled] { opacity: .5; }
+.shutter.busy span { background: transparent; border: 5px solid rgba(255,255,255,.35); border-top-color: #fff; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.cam .prog { position: absolute; left: 32px; right: 32px; top: 42%; text-align: center; font-size: 15px; line-height: 1.5; }
+.cam .bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.25); margin-top: 12px; overflow: hidden; }
+.cam .bar i { display: block; height: 100%; width: 0; background: #fff; transition: width .2s; }
 </style>
 </head>
 <body>
@@ -164,17 +206,19 @@ svg { display: block; }
         placeholder="여기를 누르고 '텍스트 스캔'"></textarea>
       <button class="btn" id="scan-go">찾기</button>
     </div>
-    <div class="hint">라벨 코드를 키보드의 텍스트 스캔으로 읽거나 직접 입력하세요. <a href="#" id="howto">사용법</a></div>
+    <div class="hint">아래 <b>카메라 스캔</b>으로 찍거나, 키보드의 텍스트 스캔·직접 입력도 돼요. <a href="#" id="howto">사용법</a></div>
   </div>
 
   <div id="list-area"><div class="loading">상품 데이터를 불러오는 중…</div></div>
+  <div style="height:88px"></div>
+  <button class="fab" id="btn-cam"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>카메라 스캔</button>
 </section>
 
 <!-- ============ 상품 목록 ============ -->
 <section id="page-catalog" class="page hidden">
   <header class="appbar"><h1>상품 목록</h1></header>
   <div class="search">
-    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.090-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
     <input id="cat-q" type="search" placeholder="품번 · 품명 · 바코드 검색" autocomplete="off" autocorrect="off" spellcheck="false">
   </div>
   <div class="chips" id="cat-chips"></div>
@@ -196,6 +240,24 @@ svg { display: block; }
   <button class="tab" data-page="saved"><span class="ind"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V6h5.17l2 2H20v10z"/></svg></span>보관함</button>
 </nav>
 
+<!-- ============ 카메라 ============ -->
+<div class="cam hidden" id="cam">
+  <video id="cam-video" playsinline muted autoplay></video>
+  <div class="shade" id="cam-guide"><i></i><i></i><i></i><i></i></div>
+  <div class="top">
+    <button class="icon-btn" id="cam-close" aria-label="닫기"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    <span class="grow"></span>
+    <button class="chipbtn hidden" id="cam-zoom">2배</button>
+    <button class="icon-btn hidden" id="cam-torch" aria-label="플래시"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2v11h3v9l7-12h-4l4-8z"/></svg></button>
+  </div>
+  <div class="tip" id="cam-tip">품번·색상·사이즈가 틀 안에 들어오게 비추고<br>아래 버튼을 누르세요</div>
+  <div class="prog hidden" id="cam-prog"><div id="cam-prog-msg"></div><div class="bar"><i id="cam-prog-bar"></i></div></div>
+  <div class="bottom">
+    <div class="result hidden" id="cam-result"></div>
+    <button class="shutter" id="cam-shot" aria-label="찍기" disabled><span></span></button>
+  </div>
+</div>
+
 <div class="dim hidden" id="dim"></div>
 <div class="sheet hidden" id="sheet">
   <div class="grab"></div>
@@ -208,8 +270,9 @@ svg { display: block; }
 'use strict';
 /* =====================================================================
    SINOON 웹 버전 (아이폰·갤럭시 공용)
-   - 글자 읽기는 휴대폰 키보드의 "텍스트 스캔"(아이폰) / "텍스트 추출"(갤럭시)에 맡기고,
-     읽힌 글자를 상품 데이터(../assets/product_barcodes.json)와 맞춰봅니다.
+   - 카메라 스캔: 휴대폰 브라우저 안에서 글자를 읽습니다(ocr.js, 사진은 밖으로 안 보냄).
+   - 키보드의 "텍스트 스캔"(아이폰) / "텍스트 추출"(갤럭시)으로 읽은 글자도 받아요.
+   - 읽힌 글자를 상품 데이터(../assets/product_barcodes.json)와 맞춰봅니다.
    - 스캔 목록·보관함·학습 기록은 이 휴대폰(브라우저)에만 저장됩니다.
    ===================================================================== */
 const DATA_URL = '../assets/product_barcodes.json';
@@ -250,11 +313,37 @@ function grams(s) {
   return out;
 }
 
+// 사이즈 표기 통일: FREE/FRE/F → F, SMALL → S …
+const SIZE_ALIAS = { FREE: 'F', FRE: 'F', F: 'F', SMALL: 'S', MEDIUM: 'M', LARGE: 'L', XLARGE: 'XL', 'X-LARGE': 'XL' };
+const sizeKeyOf = (s) => { const u = String(s || '').toUpperCase().trim(); return SIZE_ALIAS[u] || u; };
+const byBase = new Map();  // 정규화 기본 품번(라벨에 찍힌 10자리) → 옵션 목록
+const baseKeys = [];
+
 function indexProducts(list) {
   PRODUCTS = list.filter(p => p.barcode && p.itemNo);
+  // 색상 코드 → 색상 이름(상품명 괄호 안 글자에서 가장 많이 쓰인 것)
+  const nameCount = new Map();
   for (const p of PRODUCTS) {
+    const ik = p.itemNo.toUpperCase();
     p.hasColor = !!p.color && p.color !== '-';
-    p.variant = [p.hasColor ? p.color : '', p.sizeLabel || ''].filter(Boolean).join(' / ');
+    const suffix = !p.hasColor && ik.length === 12 && /^[A-Z]{2}$/.test(ik.slice(10)) ? ik.slice(10) : '';
+    p.colorCode = p.hasColor ? p.color.toUpperCase() : suffix;
+    p.base = p.hasColor ? ik : (suffix ? ik.slice(0, 10) : ik);
+    const m = [...String(p.name).matchAll(/\(([^()]+)\)/g)].pop();
+    p.colorName = m && p.colorCode ? m[1].trim().toUpperCase() : '';
+    if (p.colorName) {
+      if (!nameCount.has(p.colorCode)) nameCount.set(p.colorCode, new Map());
+      const c = nameCount.get(p.colorCode); c.set(p.colorName, (c.get(p.colorName) || 0) + 1);
+    }
+    p.sizeKey = sizeKeyOf(p.size || p.sizeLabel);
+  }
+  const fallbackName = new Map([...nameCount].map(([code, c]) => [code, [...c].sort((a, b) => b[1] - a[1])[0][0]]));
+  for (const p of PRODUCTS) {
+    if (p.colorCode && !p.colorName) p.colorName = fallbackName.get(p.colorCode) || p.colorCode;
+    p.variant = [p.colorName, p.sizeLabel || ''].filter(Boolean).join(' / ');
+    const bk = norm(p.base);
+    if (!byBase.has(bk)) { byBase.set(bk, []); baseKeys.push(bk); }
+    byBase.get(bk).push(p);
     byBarcode.set(norm(p.barcode), p);
     const ik = p.itemNo.toUpperCase();
     if (!byItemNo.has(ik)) byItemNo.set(ik, []);
@@ -362,7 +451,88 @@ function guessNear(tokens, center, pred) {
   return tokens.find(pred) || '';
 }
 
-// 결과: {type:'exact'|'learned'|'components'|'fuzzy'|'item'|'none', product, variants, suggestions}
+/* ---- 케어라벨 구조로 찾기: 기본 품번(10자리) + 색상 이름(WHITE…) + 사이즈(FREE/S/M…) ---- */
+function findBase(tokens) {
+  const cands = [...matchCandidates(tokens)].sort((a, b) => b.length - a.length);
+  for (const c of cands) if (byBase.has(c)) return { key: c, dist: 0, cand: c };
+  for (const c of cands) {           // 색상 코드까지 붙은 품번(예: SN2D2TT001WH)
+    if (c.length < 12) continue;
+    for (const L of [10, c.length - 2]) {
+      const k = c.slice(0, L);
+      if (L >= 6 && byBase.has(k)) return { key: k, dist: 0, cand: c, suffix: c.slice(L, L + 2) };
+    }
+  }
+  const near = new Map();             // 한두 글자 틀린 품번 후보들
+  for (const c of cands) {
+    if (c.length < 8 || c.length > 13) continue;
+    for (const k of baseKeys) {
+      if (Math.abs(k.length - c.length) > 1 || (k[0] !== c[0] && k[1] !== c[1])) continue;
+      const d = weightedDistance(c, k, 2);
+      if (d <= 1.2 && (!near.has(k) || d < near.get(k).dist)) near.set(k, { key: k, dist: d, cand: c });
+    }
+  }
+  const list = [...near.values()].sort((a, b) => a.dist - b.dist);
+  if (!list.length) return null;
+  if (list.length === 1 || list[1].dist - list[0].dist >= 0.55) return list[0];
+  return { ambiguous: list.slice(0, 6) };
+}
+
+function findColor(text, variants, suffix) {
+  const colors = new Map();
+  for (const v of variants) if (v.colorCode) colors.set(v.colorCode, v.colorName || v.colorCode);
+  if (colors.size <= 1) return colors.size ? { code: [...colors.keys()][0], implied: true } : null;
+  if (suffix) for (const code of colors.keys()) if (norm(code) === suffix) return { code, phrase: suffix };
+  const words = String(text).toUpperCase().split(/[^A-Z0-9]+/).filter(w => w.length >= 2 && /[A-Z]/.test(w));
+  const phrases = new Set(words);
+  for (let i = 0; i < words.length; i++) {
+    if (i + 1 < words.length) phrases.add(words[i] + ' ' + words[i + 1]);
+    if (i + 2 < words.length) phrases.add(words[i] + ' ' + words[i + 1] + ' ' + words[i + 2]);
+  }
+  let best = null;
+  for (const [code, name] of colors) for (const alt of [name, ...name.split(/[\/,&+]| - /)]) {
+    const target = norm(alt.replace(/[^A-Z0-9]/g, ''));
+    if (!target || target.length < 3) continue;
+    for (const ph of phrases) {
+      const n = norm(ph);
+      let d = n === norm(code) && ph.length === code.length ? 0.05 : weightedDistance(n, target, Math.max(1, 0.3 * target.length)) / target.length;
+      if (d > 0.3) continue;
+      if (!best || d < best.d - 1e-9 || (Math.abs(d - best.d) < 1e-9 && target.length > best.len)) best = { code, d, len: target.length, phrase: n };
+    }
+  }
+  return best;
+}
+
+function findSizes(text, variants) {
+  const have = new Set(variants.map(v => v.sizeKey));
+  const found = new Set();
+  for (const t of String(text).toUpperCase().split(/[^A-Z0-9\-]+/)) {
+    if (!t) continue;
+    let k = sizeKeyOf(t);
+    if (!have.has(k) && t.length >= 3 && t.length <= 5 && weightedDistance(norm(t), norm('FREE'), 1.2) <= 1.2) k = 'F';
+    if (have.has(k)) found.add(k);
+  }
+  return found;
+}
+
+function labelMatch(text, tokens) {
+  let base = findBase(tokens);
+  if (!base) return null;
+  if (base.ambiguous) {
+    // 비슷한 품번이 여럿이면, 라벨의 색상 이름이 맞는 쪽으로 정합니다.
+    const ok = base.ambiguous.filter(b => { const c = findColor(text, byBase.get(b.key) || []); return c && !c.implied; });
+    if (ok.length !== 1) return null;
+    base = ok[0];
+  }
+  let vs = byBase.get(base.key) || [];
+  const color = findColor(text, vs, base.suffix);
+  if (color) vs = vs.filter(v => v.colorCode === color.code);
+  const sizes = new Set([...findSizes(text, vs)]);
+  if (sizes.size === 1) vs = vs.filter(v => v.sizeKey === [...sizes][0]);
+  else if (new Set(vs.map(v => v.sizeKey)).size === 1) sizes.add(vs[0].sizeKey);
+  return { base, color, sizes, variants: vs };
+}
+
+// 결과: {type:'exact'|'label'|'learned'|'components'|'fuzzy'|'item'|'none', product, variants, suggestions}
 function analyze(text) {
   const tokens = tokenize(text);
   if (!tokens.length) return { type: 'none', suggestions: [], tokens };
@@ -376,6 +546,12 @@ function analyze(text) {
     const p = byBarcode.get(norm(t));
     if (p) return { type: 'exact', product: p, tokens };
   }
+  const lm = labelMatch(text, tokens);
+  if (lm && lm.variants.length === 1) {
+    // 품번이 정확히(또는 비슷한 글자 하나 정도만 다르게) 읽혔으면 바로 추가, 아니면 확인
+    return { type: lm.base.dist <= 0.4 ? 'label' : 'fuzzy', product: lm.variants[0], tokens, label: lm, suggestions: [] };
+  }
+  if (lm && lm.variants.length > 1) return { type: 'item', variants: lm.variants, tokens, label: lm, suggestions: [] };
   const learned = load(K_LEARNED, {});
   for (const cand of [...matchCandidates(tokens)].sort((a, b) => b.length - a.length)) {
     const m = learned[cand];
@@ -437,13 +613,15 @@ function addProduct(product, code) {
   else rec = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code: code || (product && product.barcode) || '', barcode: product ? product.barcode : null, qty: 1, at: Date.now() };
   records.unshift(rec);
   saveRecords(); renderList(); buzz();
-  const nm = product ? product.name + (product.variant ? ` (${product.variant})` : '') : code;
-  toast(merged ? `${nm} · 수량 ${rec.qty}개` : `${nm} · 추가`, '되돌리기', () => {
+  const undo = () => {
     const i = records.findIndex(r => r.id === rec.id);
     if (i < 0) return;
     if (merged && rec.qty > 1) rec.qty -= 1; else records.splice(i, 1);
     saveRecords(); renderList();
-  });
+  };
+  if (camOpen) { camShowAdded(product, code, rec.qty, undo); return; }
+  const nm = product ? product.name + (product.variant ? ` (${product.variant})` : '') : code;
+  toast(merged ? `${nm} · 수량 ${rec.qty}개` : `${nm} · 추가`, '되돌리기', undo);
 }
 
 function renderList() {
@@ -454,7 +632,7 @@ function renderList() {
   $('#list-title').textContent = records.length ? `스캔 ${records.length}종 · ${total}개` : '스캔 목록';
   if (!records.length) {
     area.innerHTML = `<div class="empty"><div class="big">${ICON_SCAN}</div><h3>아직 스캔한 상품이 없어요</h3>
-      위 칸을 누르고 키보드의 <b>텍스트 스캔</b>으로 라벨 코드를 비춰보세요.<br>같은 상품은 한 줄로 합쳐 수량이 올라가요.</div>`;
+      아래 <b>카메라 스캔</b>을 눌러 라벨을 찍어보세요.<br>같은 상품은 한 줄로 합쳐 수량이 올라가요.</div>`;
     return;
   }
   const rows = records.map((r, i) => {
@@ -499,12 +677,14 @@ function openRecord(id) {
 const input = $('#scan-input');
 let lastLen = 0, autoTimer = null;
 
+const isSure = (res) => res.type === 'exact' || res.type === 'label' || (res.type === 'learned' && res.count >= 2);
+
 function handleScan(text) {
   text = String(text || '').trim();
   if (!text || !PRODUCTS.length) return;
   const res = analyze(text);
   input.value = ''; lastLen = 0;
-  if (res.type === 'exact' || (res.type === 'learned' && res.count >= 2)) { addProduct(res.product, res.product.barcode); return; }
+  if (isSure(res)) { addProduct(res.product, res.product.barcode); return; }
   showPicker(res, text);
 }
 
@@ -526,24 +706,27 @@ function productRow(p, extra = '') {
 }
 
 function showPicker(res, rawText) {
+  const readCode = ((res.label && res.label.base.cand) || rawText).slice(0, 40);
   const list = [], seen = new Set();
   const push = (p) => { if (p && !seen.has(p.barcode)) { seen.add(p.barcode); list.push(p); } };
   if (res.product) push(res.product);
   (res.variants || []).forEach(push);
   (res.suggestions || []).forEach(s => push(s.p));
-  const title = res.product ? '이 상품이 맞나요?' : (list.length ? '정확히 안 읽혀요. 이 중에 있나요?' : '상품을 찾지 못했어요');
-  const note = res.type === 'item' ? '품번은 읽혔어요. 색상·사이즈를 골라주세요.'
+  const title = res.product ? '이 상품이 맞나요?' : res.type === 'item' ? '어떤 옵션인가요?' : (list.length ? '정확히 안 읽혀요. 이 중에 있나요?' : '상품을 찾지 못했어요');
+  const need = res.label ? [res.label.color ? '' : '색상', res.label.sizes.size === 1 ? '' : '사이즈'].filter(Boolean).join('·') : '';
+  const want = need || '옵션';
+  const note = res.type === 'item' ? `품번은 읽혔어요. ${want}${want.endsWith('즈') ? '를' : '을'} 골라주세요.`
     : res.product ? '읽힌 글자로 가장 가까운 상품을 찾았어요. 맞으면 눌러주세요.'
     : list.length ? '라벨 글자가 일부만 읽혔어요. 맞는 상품을 누르면 바로 추가돼요.' : '다시 스캔하거나 직접 검색해보세요.';
   openSheet(title, `<p class="sheetnote">${note}<br>읽힌 글자: <b>${esc(rawText.slice(0, 80))}</b></p>
-    ${list.length ? `<div class="group">${list.slice(0, 8).map(p => productRow(p)).join('')}</div>` : ''}
+    ${list.length ? `<div class="group">${list.slice(0, res.type === 'item' ? 30 : 8).map(p => productRow(p)).join('')}</div>` : ''}
     <div class="actions"><button class="btn gray wide" id="pk-search">직접 검색</button>
     <button class="btn gray wide" id="pk-code">코드만 목록에 추가</button></div>`);
   $('#sheet-body').querySelectorAll('.row').forEach(b => b.onclick = () => {
     const p = byBarcode.get(norm(b.dataset.b));
-    learn(res.tokens, p); closeSheet(); addProduct(p, rawText);
+    learn(res.tokens, p); closeSheet(); addProduct(p, readCode);
   });
-  $('#pk-search').onclick = () => openSearchSheet([...res.tokens].sort((a, b) => b.length - a.length)[0] || '', (p) => { learn(res.tokens, p); addProduct(p, rawText); });
+  $('#pk-search').onclick = () => openSearchSheet([...res.tokens].sort((a, b) => b.length - a.length)[0] || '', (p) => { learn(res.tokens, p); addProduct(p, readCode); });
   $('#pk-code').onclick = () => { closeSheet(); addProduct(null, ([...res.tokens].sort((a, b) => b.length - a.length)[0] || rawText).toUpperCase()); };
 }
 
@@ -619,7 +802,7 @@ function moreCatalog() {
   const next = catFiltered.slice(catShown, catShown + 60);
   if (!next.length) { $('#cat-more').textContent = catFiltered.length ? '' : '조건에 맞는 상품이 없어요.'; return; }
   const html = next.map(vs => {
-    const colors = [...new Set(vs.filter(v => v.hasColor).map(v => v.color))];
+    const colors = [...new Set(vs.map(v => v.colorName).filter(Boolean))];
     const sizes = [...new Set(vs.map(v => v.sizeLabel || v.size).filter(Boolean))];
     const opt = [colors.length ? '색상 ' + colors.join(', ') : '', sizes.length ? '사이즈 ' + sizes.join(', ') : ''].filter(Boolean).join(' · ');
     return `<button class="row" data-i="${esc(vs[0].itemNo)}"><span class="main"><div class="name">${esc(vs[0].name)}</div>
@@ -667,7 +850,7 @@ function suggestName() {
 function snapshotRows() {
   return [...records].reverse().map((r, i) => {
     const p = productOf(r);
-    return { no: i + 1, itemNo: p ? p.itemNo : '', name: p ? p.name : '', color: p ? p.color : '', size: p ? p.sizeLabel : '',
+    return { no: i + 1, itemNo: p ? p.itemNo : '', name: p ? p.name : '', color: p ? (p.colorName || (p.hasColor ? p.color : '')) : '', size: p ? p.sizeLabel : '',
       qty: r.qty, code: r.code, matched: p ? 'O' : 'X', at: fmtDate(r.at), barcode: r.barcode || '' };
   });
 }
@@ -775,6 +958,194 @@ function addProductSilent(product, code) {
   else records.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code: code || (product && product.barcode) || '', barcode: product ? product.barcode : null, qty: 1, at: Date.now() });
 }
 
+/* ---------------- 카메라 스캔 (휴대폰 안에서 글자 인식) ---------------- */
+let camOpen = false, camStream = null, camBusy = false, camTorch = false, camZoomed = false;
+const camVideo = $('#cam-video');
+
+function loadOcr() {
+  if (window.OCR) return Promise.resolve();
+  return new Promise((ok, bad) => {
+    const s = document.createElement('script'); s.src = 'ocr.js';
+    s.onload = ok; s.onerror = () => { s.remove(); bad(new Error('인식 도구를 불러오지 못했어요(인터넷 연결 확인)')); };
+    document.head.appendChild(s);
+  });
+}
+
+function camLayout() {
+  const W = innerWidth, H = innerHeight;
+  const w = Math.min(W - 40, 520), h = Math.round(Math.min(w * 0.8, H * 0.42));
+  const top = Math.round(Math.max(90, H * 0.42 - h / 2));
+  const g = $('#cam-guide');
+  Object.assign(g.style, { left: Math.round((W - w) / 2) + 'px', top: top + 'px', width: w + 'px', height: h + 'px' });
+  $('#cam-tip').style.top = (top + h + 16) + 'px';
+}
+
+async function openCamera() {
+  if (!PRODUCTS.length) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('이 브라우저에서는 카메라를 쓸 수 없어요. 사파리/크롬에서 열어주세요.'); return;
+  }
+  camOpen = true; closeSheet();
+  $('#cam').classList.remove('hidden'); camLayout();
+  $('#cam-result').classList.add('hidden');
+  $('#cam-shot').disabled = true;
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+    if (!camOpen) { stopStream(); return; }
+    camVideo.srcObject = camStream;
+    await camVideo.play().catch(() => {});
+    setupCamControls();
+  } catch (e) {
+    closeCamera();
+    const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+    toast(denied ? '카메라 권한이 꺼져 있어요. 브라우저 설정에서 이 사이트의 카메라를 허용해주세요.' : '카메라를 켜지 못했어요: ' + (e.message || e.name));
+    return;
+  }
+  // 인식 도구 준비(처음 한 번은 약 27MB를 받아요)
+  const prog = $('#cam-prog'), bar = $('#cam-prog-bar'), msg = $('#cam-prog-msg');
+  try {
+    await loadOcr();
+    if (!OCR.isReady()) {
+      prog.classList.remove('hidden'); msg.innerHTML = '글자 인식 도구 준비 중…<br><small>처음 한 번만 약 27MB를 받아요(와이파이 권장)</small>';
+      await OCR.init((f) => { bar.style.width = Math.round(f * 100) + '%'; });
+    }
+    prog.classList.add('hidden');
+    if (camOpen) $('#cam-shot').disabled = false;
+  } catch (e) {
+    prog.classList.remove('hidden');
+    msg.innerHTML = '인식 도구를 받지 못했어요.<br><small>인터넷 연결을 확인하고 다시 열어주세요.</small>';
+  }
+}
+
+function setupCamControls() {
+  const track = camStream && camStream.getVideoTracks()[0];
+  const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+  camTorch = false; camZoomed = false;
+  const tb = $('#cam-torch'), zb = $('#cam-zoom');
+  tb.classList.toggle('hidden', !caps.torch); tb.classList.remove('on');
+  zb.classList.toggle('hidden', !(caps.zoom && caps.zoom.max >= 1.5)); zb.classList.remove('on');
+  tb.onclick = () => { camTorch = !camTorch; track.applyConstraints({ advanced: [{ torch: camTorch }] }).catch(() => {}); tb.classList.toggle('on', camTorch); };
+  zb.onclick = () => {
+    camZoomed = !camZoomed;
+    const z = camZoomed ? Math.min(2, caps.zoom.max) : Math.max(1, caps.zoom.min || 1);
+    track.applyConstraints({ advanced: [{ zoom: z }] }).catch(() => {}); zb.classList.toggle('on', camZoomed);
+  };
+}
+
+function stopStream() {
+  if (camStream) camStream.getTracks().forEach(t => t.stop());
+  camStream = null; camVideo.srcObject = null;
+}
+
+function closeCamera() {
+  camOpen = false; stopStream();
+  $('#cam').classList.add('hidden'); $('#cam-prog').classList.add('hidden');
+}
+
+// 화면의 틀 영역을 영상 좌표로 바꿔서 잘라냅니다(조금 여유 있게).
+function grabGuide() {
+  const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+  if (!vw || !vh) return null;
+  const vr = camVideo.getBoundingClientRect(), gr = $('#cam-guide').getBoundingClientRect();
+  const sc = Math.max(vr.width / vw, vr.height / vh);
+  const offX = (vr.width - vw * sc) / 2, offY = (vr.height - vh * sc) / 2;
+  const padX = gr.width * 0.08, padY = gr.height * 0.08;
+  let sx = (gr.left - vr.left - offX - padX) / sc, sy = (gr.top - vr.top - offY - padY) / sc;
+  let sw = (gr.width + 2 * padX) / sc, sh = (gr.height + 2 * padY) / sc;
+  sx = Math.max(0, sx); sy = Math.max(0, sy); sw = Math.min(vw - sx, sw); sh = Math.min(vh - sy, sh);
+  const k = Math.min(1, 1280 / Math.max(sw, sh));
+  const c = document.createElement('canvas'); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+  const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(camVideo, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return c;
+}
+
+async function camShoot() {
+  if (camBusy || !OCR.isReady()) return;
+  const canvas = grabGuide(); if (!canvas) return;
+  camBusy = true;
+  const shot = $('#cam-shot'), guide = $('#cam-guide');
+  shot.classList.add('busy'); guide.classList.add('busy'); camVideo.pause();
+  try {
+    const lines = await OCR.recognize(canvas, { detMax: 960 });
+    await handleOcrLines(lines, canvas);
+  } catch (e) {
+    camShowMsg('warn', '인식 중 문제가 생겼어요', String(e && e.message || e));
+  } finally {
+    camBusy = false; shot.classList.remove('busy'); guide.classList.remove('busy');
+    if (camOpen) camVideo.play().catch(() => {});
+  }
+}
+
+const lineHas = (l, n) => n && norm(l.text).includes(n);
+
+// 사이즈 글자(S·M 등)가 작아서 못 읽혔을 때: 색상 줄 바로 아래를 크게 잘라 다시 읽기
+async function rescueSize(lines, canvas, res) {
+  const lm = res.label; if (!lm || !lm.color || lm.sizes.size === 1) return null;
+  const codeL = lines.find(l => lineHas(l, lm.base.cand)) || lines.find(l => lineHas(l, lm.base.key));
+  const colorL = lm.color.phrase ? lines.find(l => lineHas(l, lm.color.phrase)) : null;
+  if (!codeL || !colorL) return null;
+  const g = codeL.g, cw = Math.hypot(g.A[0], g.A[1]), lh = Math.hypot(g.B[0], g.B[1]);
+  const u = [g.A[0] / cw, g.A[1] / cw], v = [g.B[0] / lh, g.B[1] / lh];
+  const ctr = (x) => [x.g.O[0] + (x.g.A[0] + x.g.B[0]) / 2, x.g.O[1] + (x.g.A[1] + x.g.B[1]) / 2];
+  const cc = ctr(codeL), oc = ctr(colorL);
+  let sp = (oc[0] - cc[0]) * v[0] + (oc[1] - cc[1]) * v[1];
+  if (sp < lh * 0.6) sp = lh * 1.4;
+  const t = [oc[0] + v[0] * sp * 1.4, oc[1] + v[1] * sp * 1.4], hw = cw * 0.5, hh = sp;
+  const O = [t[0] - u[0] * hw - v[0] * hh, t[1] - u[1] * hw - v[1] * hh];
+  const k = 48 / lh;
+  const found = await OCR.recognizeRegion(canvas, O, [u[0] * 2 * hw, u[1] * 2 * hw], [v[0] * 2 * hh, v[1] * 2 * hh],
+    Math.max(32, Math.round(2 * hw * k)), Math.max(32, Math.round(2 * hh * k)));
+  const want = new Set(lm.variants.map(x => x.sizeKey));
+  const hits = new Set();
+  for (const f of found) for (const tk of f.text.toUpperCase().split(/[^A-Z0-9]+/)) { const sk = sizeKeyOf(tk); if (want.has(sk)) hits.add(sk); }
+  return hits.size === 1 ? [...hits][0] : null;
+}
+
+async function handleOcrLines(lines, canvas) {
+  const text = lines.map(l => l.text).join('\n');
+  if (!lines.length) { camShowMsg('warn', '글자를 찾지 못했어요', '라벨을 틀 안에 가깝게, 흔들리지 않게 비춰주세요.'); return; }
+  let res = analyze(text);
+  if (res.type === 'item' && res.label) {
+    const sz = await rescueSize(lines, canvas, res).catch(() => null);
+    if (sz) { const r2 = analyze(text + '\n' + (sz === 'F' ? 'FREE' : sz)); if (r2.product) res = r2; }
+  }
+  if (isSure(res)) { addProduct(res.product, res.product.barcode); return; }
+  if (res.type === 'none' && !(res.suggestions || []).length) {
+    camShowMsg('warn', '상품 코드를 못 읽었어요', '읽힌 글자: ' + text.replace(/\n/g, ' ').slice(0, 60)); return;
+  }
+  showPicker(res, text.replace(/\n/g, ' '));
+}
+
+let camMsgTimer = null;
+function camShowMsg(kind, title, sub, actLabel, act) {
+  const box = $('#cam-result');
+  box.className = 'result ' + (kind || '');
+  box.innerHTML = `<div class="txt"><b>${esc(title)}</b>${esc(sub || '')}</div>${actLabel ? `<button id="cr-act">${esc(actLabel)}</button>` : ''}<button class="x" id="cr-x" aria-label="닫기">×</button>`;
+  if (actLabel) $('#cr-act').onclick = () => { act && act(); box.classList.add('hidden'); };
+  $('#cr-x').onclick = () => box.classList.add('hidden');
+  clearTimeout(camMsgTimer);
+}
+
+function camShowAdded(product, code, qty, undo) {
+  const nm = product ? product.name : code;
+  const sub = (product && product.variant ? product.variant + ' · ' : '') + `목록 ${qty}개`;
+  camShowMsg('ok', '✓ ' + nm, sub, '되돌리기', () => { undo(); camShowMsg('', '되돌렸어요', ''); });
+}
+
+$('#btn-cam').onclick = openCamera;
+$('#cam-close').onclick = closeCamera;
+$('#cam-shot').onclick = camShoot;
+addEventListener('resize', () => { if (camOpen) camLayout(); });
+document.addEventListener('visibilitychange', () => {
+  // 다른 앱으로 나가면 카메라를 끄고, 돌아오면 다시 켭니다.
+  if (!camOpen) return;
+  if (document.hidden) stopStream();
+  else if (!camStream) navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } })
+    .then(st => { if (!camOpen) { st.getTracks().forEach(t => t.stop()); return; } camStream = st; camVideo.srcObject = st; camVideo.play().catch(() => {}); setupCamControls(); }).catch(() => {});
+});
+
 /* ---------------- 더보기 / 사용법 ---------------- */
 $('#btn-more').onclick = () => {
   const learnedN = Object.keys(load(K_LEARNED, {})).length;
@@ -793,7 +1164,8 @@ $('#btn-more').onclick = () => {
 
 function showHowTo() {
   openSheet('사용법', `<div style="padding:4px 24px 8px;line-height:1.65;font-size:15px">
-    <b>아이폰</b><br>① 위의 입력 칸을 누릅니다.<br>② 키보드 위에 뜨는 <b>텍스트 스캔</b> 아이콘(네모 안 글줄)을 누르거나, 칸을 한 번 더 눌러 <b>텍스트 스캔</b>을 고릅니다.<br>③ 라벨의 코드를 노란 틀 안에 비추고 <b>입력</b>을 누르면 자동으로 찾아요.<br><br>
+    <b>카메라 스캔(추천)</b><br>① 오른쪽 아래 <b>카메라 스캔</b>을 누르고 카메라를 허용합니다.<br>② 라벨의 품번·색상·사이즈가 흰 틀 안에 들어오게 비추고 동그란 버튼을 누릅니다.<br>③ 정확히 읽히면 바로 목록에 담기고, 헷갈리면 고를 수 있는 창이 떠요. 카메라는 켜진 채로 다음 라벨을 찍으면 돼요.<br>처음 한 번은 글자 인식 도구(약 27MB)를 받아요. 사진은 휴대폰 밖으로 보내지 않아요.<br><br>
+    <b>키보드 텍스트 스캔</b><br><b>아이폰</b><br>① 위의 입력 칸을 누릅니다.<br>② 키보드 위에 뜨는 <b>텍스트 스캔</b> 아이콘(네모 안 글줄)을 누르거나, 칸을 한 번 더 눌러 <b>텍스트 스캔</b>을 고릅니다.<br>③ 라벨의 코드를 노란 틀 안에 비추고 <b>입력</b>을 누르면 자동으로 찾아요.<br><br>
     <b>갤럭시</b><br>① 입력 칸을 누릅니다.<br>② 삼성 키보드 위쪽 도구 모음의 <b>텍스트 추출</b>(또는 ··· 안에 있음)을 누르고 라벨을 비춥니다.<br>③ 코드가 들어가면 자동으로 찾아요.<br>도구가 안 보이면 카메라 앱으로 라벨을 찍어 글자를 복사해 붙여넣어도 돼요.<br><br>
     <b>홈 화면에 추가</b><br>아이폰: 사파리 아래 공유 버튼 → 홈 화면에 추가<br>갤럭시: 크롬/삼성 인터넷 메뉴 → 홈 화면에 추가<br>한 번 열어둔 뒤에는 인터넷 없이도 열려요.<br><br>
     스캔 목록·보관함은 이 휴대폰 안에만 저장돼요. 브라우저 기록/데이터를 지우면 같이 지워지니 중요한 목록은 엑셀로 받아두세요.</div>`);
