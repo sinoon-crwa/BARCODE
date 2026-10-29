@@ -201,6 +201,7 @@ svg { display: block; }
 <section id="page-list" class="page">
   <header class="appbar">
     <h1 id="list-title">스캔 목록</h1>
+    <button class="icon-btn" id="btn-xlsx" title="엑셀로 받기/보내기" aria-label="엑셀로 받기/보내기"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7.5 17h2.2l1.8-3 1.8 3h2.2l-2.9-4.5L15.5 8h-2.2l-1.8 3-1.8-3H7.5l2.9 4.5z"/></svg></button>
     <button class="icon-btn" id="btn-save" title="이름 붙여 저장" aria-label="이름 붙여 저장"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 6h9v4H6z"/></svg></button>
     <button class="icon-btn" id="btn-more" title="더보기" aria-label="더보기"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></button>
   </header>
@@ -235,7 +236,9 @@ svg { display: block; }
 <!-- ============ 보관함 ============ -->
 <section id="page-saved" class="page hidden">
   <header class="appbar"><h1>보관함</h1></header>
-  <p class="sub">"저장"한 목록이 이 휴대폰에 남아요. 눌러서 엑셀로 받거나 보낼 수 있어요.</p>
+  <p class="sub">"저장"한 목록이 이 기기에 남아요. 눌러서 엑셀로 받거나 보낼 수 있어요.<br>다른 휴대폰·PC에서 받은 엑셀은 아래 버튼으로 불러올 수 있어요.</p>
+  <div class="actions" style="margin:0 16px 12px"><button class="btn gray wide" id="btn-import">엑셀 불러오기 (다른 기기에서 옮기기)</button></div>
+  <input type="file" id="import-file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px">
   <div id="saved-area"></div>
 </section>
 
@@ -545,6 +548,33 @@ function labelMatch(text, tokens) {
   }
   let vs = byBase.get(base.key) || [];
   let color = findColor(text, vs, base.suffix);
+  // 읽힌 색상(GREY, GR 등)이 이 품번에 없으면, 한두 글자 다른 품번 중 그 색상이 있는 상품을 찾습니다.
+  // (예: 택에 SN2F3BS001GR-S로 찍혔거나 001로 잘못 읽혔는데, 실제 GREY는 SN2F3BS003에만 있음)
+  if (!color && new Set(vs.map(v => v.colorCode)).size > 1) {
+    const alts = [];
+    for (const k of baseKeys) {
+      if (k === base.key || Math.abs(k.length - base.key.length) > 1) continue;
+      const d = weightedDistance(base.key, k, 1.2);
+      if (d > 1.2) continue;
+      const kvs = byBase.get(k) || [];
+      const c = findColor(text, kvs, base.suffix);
+      if (c && !c.implied && !c.ambiguous) alts.push({ k, d, c });
+    }
+    // 후보가 여럿이면 함께 찍힌 상품명·가격으로 고릅니다.
+    let pick = alts.length === 1 ? alts[0] : null;
+    if (!pick && alts.length > 1) {
+      const fit = alts.filter(a => (byBase.get(a.k) || []).some(v => v.colorCode === a.c.code && (nameMatches(text, v) || priceIn(text, v))));
+      if (fit.length === 1) pick = fit[0];
+    }
+    if (pick) {
+      base = { ...base, key: pick.k, dist: Math.max(base.dist, pick.d), corrected: true };
+      vs = byBase.get(base.key) || []; color = pick.c;
+    } else if (alts.length > 1) {
+      // 못 고르면 그 색상이 있는 후보 상품들을 보여줍니다(원래 품번의 다른 색상 대신).
+      vs = alts.flatMap(a => (byBase.get(a.k) || []).filter(v => v.colorCode === a.c.code));
+      base = { ...base, dist: Math.max(base.dist, 1), corrected: true };
+    }
+  }
   if (color && color.ambiguous) { const set = new Set(color.ambiguous); vs = vs.filter(v => set.has(v.colorCode)); color = null; }
   else if (color) vs = vs.filter(v => v.colorCode === color.code);
   // 품번 뒤에 색상·사이즈가 붙어 읽힌 경우(SN2G3BS003GRF, SN2F3BS003GR-F)의 사이즈 부분도 봅니다.
@@ -553,6 +583,23 @@ function labelMatch(text, tokens) {
   if (sizes.size === 1) vs = vs.filter(v => v.sizeKey === [...sizes][0]);
   else if (new Set(vs.map(v => v.sizeKey)).size === 1) sizes.add(vs[0].sizeKey);
   return { base, color, sizes, variants: dedupeSame(vs) };
+}
+
+// 가격표에 찍힌 가격(예: W158,000)이 이 상품 가격과 같은지
+function priceIn(text, p) {
+  if (!p.price) return false;
+  for (const m of String(text).matchAll(/\d{1,3}(?:[,.]\d{3})+|\d{4,7}/g)) if (parseInt(m[0].replace(/[,.]/g, ''), 10) === p.price) return true;
+  return false;
+}
+
+// 가격표처럼 상품명이 같이 찍혀 있으면, 그 이름이 이 상품과 맞는지 확인합니다.
+function nameMatches(text, p) {
+  const words = String(text).toUpperCase().split(/[^A-Z0-9]+/).filter(w => w.length >= 3);
+  const nameWords = String(p.name).replace(/\([^)]*\)/g, ' ').toUpperCase().split(/[^A-Z0-9]+/).filter(w => w.length >= 3);
+  if (nameWords.length < 2 || !words.length) return false;
+  let hit = 0;
+  for (const nw of nameWords) if (words.some(w => weightedDistance(norm(w), norm(nw), Math.max(1, nw.length * 0.25)) <= Math.max(1, nw.length * 0.25))) hit++;
+  return hit / nameWords.length >= 0.75;
 }
 
 // 같은 상품(기본 품번·색상·사이즈가 같음)이 바코드 형식만 다르게 두 번 들어 있으면 하나만 남깁니다.
@@ -588,7 +635,8 @@ function analyze(text) {
   const lm = labelMatch(text, tokens);
   if (lm && lm.variants.length === 1) {
     // 품번이 정확히(또는 비슷한 글자 하나 정도만 다르게) 읽혔으면 바로 추가, 아니면 확인
-    return { type: lm.base.dist <= 0.4 ? 'label' : 'fuzzy', product: lm.variants[0], tokens, label: lm, suggestions: [] };
+    const sure = lm.base.dist <= 0.4 || nameMatches(text, lm.variants[0]);
+    return { type: sure ? 'label' : 'fuzzy', product: lm.variants[0], tokens, label: lm, suggestions: [] };
   }
   if (lm && lm.variants.length > 1) return { type: 'item', variants: lm.variants, tokens, label: lm, suggestions: [] };
   const learned = load(K_LEARNED, {});
@@ -668,6 +716,7 @@ function renderList() {
   if (!PRODUCTS.length) return;
   const total = records.reduce((s, r) => s + r.qty, 0);
   $('#btn-save').disabled = !records.length;
+  $('#btn-xlsx').disabled = !records.length;
   $('#list-title').textContent = records.length ? `스캔 ${records.length}종 · ${total}개` : '스캔 목록';
   if (!records.length) {
     area.innerHTML = `<div class="empty"><div class="big">${ICON_SCAN}</div><h3>아직 스캔한 상품이 없어요</h3>
@@ -754,7 +803,8 @@ function showPicker(res, rawText) {
   const title = res.product ? '이 상품이 맞나요?' : res.type === 'item' ? '어떤 옵션인가요?' : (list.length ? '정확히 안 읽혀요. 이 중에 있나요?' : '상품을 찾지 못했어요');
   const need = res.label ? [res.label.color ? '' : '색상', res.label.sizes.size === 1 ? '' : '사이즈'].filter(Boolean).join('·') : '';
   const want = need || '옵션';
-  const note = res.type === 'item' ? `품번은 읽혔어요. ${want}${want.endsWith('즈') ? '를' : '을'} 골라주세요.`
+  const note = res.label && res.label.base.corrected && !res.product ? '찍힌 품번과 색상이 상품 데이터와 달라요. 이 중 맞는 상품을 골라주세요.'
+    : res.type === 'item' ? `품번은 읽혔어요. ${want}${want.endsWith('즈') ? '를' : '을'} 골라주세요.`
     : res.product ? '읽힌 글자로 가장 가까운 상품을 찾았어요. 맞으면 눌러주세요.'
     : list.length ? '라벨 글자가 일부만 읽혔어요. 맞는 상품을 누르면 바로 추가돼요.' : '다시 스캔하거나 직접 검색해보세요.';
   openSheet(title, `<p class="sheetnote">${note}<br>읽힌 글자: <b>${esc(rawText.slice(0, 80))}</b></p>
@@ -947,7 +997,8 @@ async function exportEntry(entry) {
     const fname = entry.name.replace(/[\\/:*?"<>|]/g, ' ').trim() + '.xlsx';
     const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const file = new File([buf], fname, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    const isPhone = matchMedia('(pointer: coarse)').matches;
+    if (isPhone && navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: entry.name }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
     }
     const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = fname;
@@ -996,6 +1047,77 @@ function addProductSilent(product, code) {
   if (r) r.qty += 1;
   else records.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code: code || (product && product.barcode) || '', barcode: product ? product.barcode : null, qty: 1, at: Date.now() });
 }
+
+/* ---------------- 스캔 목록 바로 엑셀 / 다른 기기에서 엑셀 불러오기 ---------------- */
+$('#btn-xlsx').onclick = () => {
+  if (!records.length) return;
+  // 저장하지 않고 지금 스캔 목록을 바로 엑셀로(휴대폰은 카톡·메일 등으로 보내기, PC는 파일로 받기)
+  exportEntry({ name: dateName(), rows: snapshotRows() });
+};
+
+function importRowsFromSheet(aoa) {
+  // 이 앱이 만든 엑셀(번호/품번/품명/색상/사이즈/수량/인식코드/매칭여부/인식일시/바코드)과
+  // 비슷한 형식(바코드·품번·수량 열이 있는 표)을 읽습니다.
+  let h = -1, col = {};
+  for (let i = 0; i < Math.min(aoa.length, 10); i++) {
+    const row = (aoa[i] || []).map(x => String(x ?? '').trim());
+    if (row.includes('수량') && (row.includes('바코드') || row.includes('품번') || row.includes('인식코드'))) {
+      h = i; row.forEach((name, j) => { if (name && !(name in col)) col[name] = j; }); break;
+    }
+  }
+  if (h < 0) throw new Error('이 앱에서 만든 엑셀(바코드·품번·수량 열)이 아니에요.');
+  const get = (r, name) => col[name] == null ? '' : String(r[col[name]] ?? '').trim();
+  const items = new Map();
+  for (const r of aoa.slice(h + 1)) {
+    if (!r || !r.length) continue;
+    const first = String(r[0] ?? '').trim();
+    if (first === '합계') continue;
+    const qty = parseInt(get(r, '수량'), 10);
+    if (!(qty > 0)) continue;
+    const bc = get(r, '바코드'), code = get(r, '인식코드') || get(r, '품번');
+    let p = bc ? byBarcode.get(norm(bc)) : null;
+    if (!p && code) { const res = analyze(code); if (isSure(res)) p = res.product; }
+    if (!p && !code && !bc) continue;
+    const key = p ? 'P:' + p.barcode.toUpperCase() : 'C:' + (code || bc).toUpperCase();
+    const it = items.get(key) || { p, code: code || bc || (p && p.barcode), qty: 0, at: Date.now() };
+    it.qty += qty; items.set(key, it);
+  }
+  return [...items.values()];
+}
+
+$('#btn-import').onclick = () => { $('#import-file').value = ''; $('#import-file').click(); };
+$('#import-file').onchange = async (e) => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  let items;
+  try {
+    const XLSX = await loadXlsx();
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    items = importRowsFromSheet(XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }));
+  } catch (err) { toast(err.message || '엑셀을 읽지 못했어요'); return; }
+  if (!items.length) { toast('불러올 상품이 없어요'); return; }
+  const name = f.name.replace(/\.(xlsx|xls|csv)$/i, '');
+  const total = items.reduce((s, it) => s + it.qty, 0), unk = items.filter(it => !it.p).length;
+  openSheet('엑셀 불러오기', `<p class="sheetnote"><b>${esc(f.name)}</b><br>${items.length}종 · ${total}개${unk ? ` (상품 미확인 ${unk}종)` : ''}를 찾았어요.</p>
+    <div class="actions"><button class="btn wide" id="im-saved">보관함에 저장</button>
+    <button class="btn gray wide" id="im-list">지금 스캔 목록에 더하기</button></div>
+    <div class="sechead">내용</div><div class="group">${items.map(it => `<div class="row"><span class="main"><div class="name">${esc(it.p ? it.p.name : '(상품명 미확인)')}</div>
+      <div class="meta">${esc(it.p ? it.p.itemNo + (it.p.variant ? ' · ' + it.p.variant : '') : it.code)}</div></span><span class="pill">${it.qty}개</span></div>`).join('')}</div>`);
+  $('#im-saved').onclick = () => {
+    const rows = items.map((it, i) => {
+      const p = it.p;
+      return { no: i + 1, itemNo: p ? p.itemNo : '', name: p ? p.name : '', color: p ? (p.colorName || (p.hasColor ? p.color : '')) : '', size: p ? p.sizeLabel : '',
+        qty: it.qty, code: it.code || '', matched: p ? 'O' : 'X', at: fmtDate(it.at), barcode: p ? p.barcode : '' };
+    });
+    const entry = { id: Date.now().toString(36), name, at: Date.now(), rows };
+    saved.unshift(entry); store(K_SAVED, saved); renderSaved(); closeSheet(); switchPage('saved');
+    toast(`'${name}'을 보관함에 저장했어요`);
+  };
+  $('#im-list').onclick = () => {
+    for (const it of items.slice().reverse()) for (let i = 0; i < it.qty; i++) addProductSilent(it.p, it.code);
+    saveRecords(); renderList(); closeSheet(); switchPage('list'); toast(`${items.length}종 · ${total}개를 스캔 목록에 더했어요`);
+  };
+};
 
 /* ---------------- 카메라 스캔 (휴대폰 안에서 글자 인식) ---------------- */
 let camOpen = false, camStream = null, camBusy = false, camTorch = false, camZoomed = false;
@@ -1249,10 +1371,12 @@ $('#btn-more').onclick = () => {
   const learnedN = Object.keys(load(K_LEARNED, {})).length;
   openSheet('더보기', `<div class="actions">
     <button class="btn gray wide" id="m-how">사용법 보기</button>
+    <button class="btn gray wide" id="m-import">엑셀 불러오기 (다른 기기에서 옮기기)</button>
     <button class="btn gray wide" id="m-ocr">카메라 인식 도구 확인 중…</button>
     <button class="btn gray wide" id="m-learn">인식 학습 기록 지우기 (${learnedN}건)</button>
     <button class="btn gray wide destructive" id="m-clear" ${records.length ? '' : 'disabled'}>스캔 목록 전체 삭제</button></div>`);
   $('#m-how').onclick = showHowTo;
+  $('#m-import').onclick = () => { closeSheet(); $('#btn-import').click(); };
   const mo = $('#m-ocr');
   ocrDownloaded().then((ok) => {
     if (!mo.isConnected) return;
@@ -1278,6 +1402,7 @@ function showHowTo() {
     <b>카메라 스캔(추천)</b><br>① 오른쪽 아래 <b>카메라 스캔</b>을 누릅니다. 처음 한 번은 <b>받기</b>를 눌러 글자 인식 도구(약 26MB)를 받고, 다 받으면 <b>카메라 켜기</b>를 누른 뒤 카메라를 허용합니다.<br>② 라벨의 품번·색상·사이즈가 흰 틀 안에 들어오게 비추고 동그란 버튼을 누릅니다.<br>③ 정확히 읽히면 바로 목록에 담기고, 헷갈리면 고를 수 있는 창이 떠요. 카메라는 켜진 채로 다음 라벨을 찍으면 돼요.<br>받은 도구는 휴대폰에 저장돼서 다시 받지 않아요(더보기에서 확인·삭제). 사진은 휴대폰 밖으로 보내지 않아요.<br><br>
     <b>키보드 텍스트 스캔</b><br><b>아이폰</b><br>① 위의 입력 칸을 누릅니다.<br>② 키보드 위에 뜨는 <b>텍스트 스캔</b> 아이콘(네모 안 글줄)을 누르거나, 칸을 한 번 더 눌러 <b>텍스트 스캔</b>을 고릅니다.<br>③ 라벨의 코드를 노란 틀 안에 비추고 <b>입력</b>을 누르면 자동으로 찾아요.<br><br>
     <b>갤럭시</b><br>① 입력 칸을 누릅니다.<br>② 삼성 키보드 위쪽 도구 모음의 <b>텍스트 추출</b>(또는 ··· 안에 있음)을 누르고 라벨을 비춥니다.<br>③ 코드가 들어가면 자동으로 찾아요.<br>도구가 안 보이면 카메라 앱으로 라벨을 찍어 글자를 복사해 붙여넣어도 돼요.<br><br>
+    <b>엑셀로 보내기 · 다른 기기로 옮기기</b><br>스캔 목록 위의 엑셀 버튼(X 모양)을 누르면 바로 엑셀이 만들어져요. 휴대폰은 카톡·메일 등으로 보내고, PC는 파일로 받아져요.<br>다른 휴대폰·PC에서는 이 링크를 열고 <b>보관함 → 엑셀 불러오기</b>로 그 파일을 고르면 목록이 그대로 옮겨져요.<br><br>
     <b>홈 화면에 추가</b><br>아이폰: 사파리 아래 공유 버튼 → 홈 화면에 추가<br>갤럭시: 크롬/삼성 인터넷 메뉴 → 홈 화면에 추가<br>한 번 열어둔 뒤에는 인터넷 없이도 열려요.<br><br>
     스캔 목록·보관함은 이 휴대폰 안에만 저장돼요. 브라우저 기록/데이터를 지우면 같이 지워지니 중요한 목록은 엑셀로 받아두세요.</div>`);
 }
