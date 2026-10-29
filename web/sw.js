@@ -1,6 +1,6 @@
 // SINOON 웹 버전 오프라인용: 한 번 열어둔 화면·상품 데이터·엑셀 도구·글자 인식 도구를 휴대폰에 보관해서
 // 인터넷이 없어도 열리게 합니다. 화면과 상품 데이터는 인터넷이 되면 항상 최신 것으로 받아옵니다.
-const CACHE = 'sinoon-web-v3';
+const CACHE = 'sinoon-web-v4';
 const OCR_CACHE = 'sinoon-ocr-v1'; // 글자 인식 모델(약 27MB)은 화면이 바뀌어도 다시 받지 않도록 따로 보관
 const DATA = '../assets/product_barcodes.json';
 const SHELL = ['./', './index.html', './ocr.js', './manifest.json', './icon.svg', DATA,
