@@ -3,7 +3,8 @@
    SINOON 웹 카메라 글자 인식
    - PaddleOCR(PP-OCRv4) 모델을 휴대폰 브라우저 안에서 직접 돌립니다.
      사진은 어디로도 보내지지 않아요.
-   - 모델·실행도구는 처음 한 번만 인터넷에서 받고, 그 뒤로는 휴대폰에 보관된 것을 씁니다.
+   - 모델·실행도구(약 27MB)는 처음 한 번만 받아 휴대폰(브라우저 저장소)에 보관하고,
+     그 뒤로는 인터넷 없이 보관된 것으로 켭니다.
    ===================================================================== */
 const OCR = (() => {
   const ORT_BASE = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
@@ -14,20 +15,35 @@ const OCR = (() => {
     keys: MODEL_BASE + 'ppocr_keys_v1.txt',
     wasm: ORT_BASE + 'ort-wasm-simd-threaded.wasm',
   };
-  const SIZES = { det: 4745517, rec: 10822323, keys: 26249, wasm: 11246032 };
+  // 받아서 휴대폰에 보관할 파일(실행 도구 + 모델)과 크기
+  const CACHE_NAME = 'sinoon-ocr-v1';
+  const PARTS = [
+    { url: ORT_BASE + 'ort.wasm.min.js', size: 49026, type: 'text/javascript' },
+    { url: ORT_BASE + 'ort-wasm-simd-threaded.mjs', size: 24618, type: 'text/javascript' },
+    { url: FILES.wasm, size: 11246032, type: 'application/wasm' },
+    { url: FILES.det, size: 4745517, type: 'application/octet-stream' },
+    { url: FILES.rec, size: 10822323, type: 'application/octet-stream' },
+    { url: FILES.keys, size: 26249, type: 'text/plain' },
+  ];
+  const TOTAL = PARTS.reduce((a, p) => a + p.size, 0);
 
   let readyPromise = null, det = null, rec = null, KEYS = null;
 
-  function loadScript(src) {
-    return new Promise((ok, bad) => {
-      const s = document.createElement('script');
-      s.src = src; s.onload = ok; s.onerror = () => { s.remove(); bad(new Error('불러오기 실패: ' + src)); };
-      document.head.appendChild(s);
-    });
+  async function openCache() {
+    try { return 'caches' in self ? await caches.open(CACHE_NAME) : null; } catch (_) { return null; }
   }
+  async function missingParts() {
+    const c = await openCache();
+    if (!c) return PARTS.slice();
+    const out = [];
+    for (const p of PARTS) if (!(await c.match(p.url))) out.push(p);
+    return out;
+  }
+  // 휴대폰에 다 받아져 있는지
+  async function isDownloaded() { return (await missingParts()).length === 0; }
 
   async function fetchBuf(url, onBytes) {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('다운로드 실패(' + res.status + ')');
     if (!res.body || !res.body.getReader) { const b = await res.arrayBuffer(); onBytes(b.byteLength); return b; }
     const reader = res.body.getReader(), parts = [];
@@ -42,25 +58,57 @@ const OCR = (() => {
     return out.buffer;
   }
 
-  // onProgress(0~1) 로 받는 진행률을 알려줍니다.
+  // 아직 없는 파일만 받아서 보관합니다. onProgress(받은 바이트, 전체 바이트)
+  async function download(onProgress) {
+    const c = await openCache();
+    const need = await missingParts();
+    let got = TOTAL - need.reduce((a, p) => a + p.size, 0);
+    onProgress && onProgress(got, TOTAL);
+    for (const p of need) {
+      let partGot = 0;
+      const buf = await fetchBuf(p.url, (n) => { partGot += n; onProgress && onProgress(Math.min(TOTAL, got + partGot), TOTAL); });
+      got += p.size;
+      if (c) await c.put(p.url, new Response(buf, { headers: { 'content-type': p.type, 'content-length': String(buf.byteLength) } }));
+    }
+    onProgress && onProgress(TOTAL, TOTAL);
+    try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (_) {}
+  }
+
+  async function remove() {
+    try { if ('caches' in self) await caches.delete(CACHE_NAME); } catch (_) {}
+  }
+
+  async function getBuf(url) {
+    const c = await openCache();
+    const hit = c && await c.match(url);
+    if (hit) return hit.arrayBuffer();
+    return fetchBuf(url, () => {});
+  }
+  async function getText(url) { return new TextDecoder().decode(await getBuf(url)); }
+
+  // 보관된 파일로 인식 도구를 켭니다(인터넷 없어도 됨). 안 받은 게 있으면 먼저 받아요.
   function init(onProgress) {
     if (readyPromise) return readyPromise;
     readyPromise = (async () => {
-      const total = Object.values(SIZES).reduce((a, b) => a + b, 0);
-      let got = 0;
-      const tick = (n) => { got += n; onProgress && onProgress(Math.min(1, got / total)); };
-      if (!window.ort) await loadScript(ORT_BASE + 'ort.wasm.min.js');
-      const [wasm, d, r, k] = await Promise.all([
-        fetchBuf(FILES.wasm, tick), fetchBuf(FILES.det, tick), fetchBuf(FILES.rec, tick), fetchBuf(FILES.keys, tick)]);
-      ort.env.wasm.wasmPaths = ORT_BASE;
+      if (!(await isDownloaded())) await download(onProgress);
+      if (!window.ort) {
+        const code = await getText(PARTS[0].url);
+        const s = document.createElement('script');
+        s.textContent = code; document.head.appendChild(s);
+        if (!window.ort) throw new Error('인식 도구를 실행하지 못했어요');
+      }
+      // 실행 도구 모듈도 보관된 것으로 띄웁니다(blob 주소에서는 상대 경로를 못 쓰므로 wasm 주소를 절대 경로로 바꿔둠).
+      const mjs = (await getText(PARTS[1].url)).split('new URL("ort-wasm-simd-threaded.wasm",import.meta.url)').join('new URL(' + JSON.stringify(FILES.wasm) + ')');
+      const mjsUrl = URL.createObjectURL(new Blob([mjs], { type: 'text/javascript' }));
+      const [wasm, d, r, k] = await Promise.all([getBuf(FILES.wasm), getBuf(FILES.det), getBuf(FILES.rec), getBuf(FILES.keys)]);
+      ort.env.wasm.numThreads = 1;
+      ort.env.wasm.wasmPaths = { mjs: mjsUrl };
       ort.env.wasm.wasmBinary = wasm;
-      ort.env.wasm.numThreads = (self.crossOriginIsolated && navigator.hardwareConcurrency) ? Math.min(4, navigator.hardwareConcurrency) : 1;
       const opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
       det = await ort.InferenceSession.create(new Uint8Array(d), opt);
       rec = await ort.InferenceSession.create(new Uint8Array(r), opt);
       KEYS = ['', ...new TextDecoder().decode(k).split(/\r?\n/), ' '];
       if (KEYS.length > 1 && KEYS[KEYS.length - 2] === '') KEYS.splice(KEYS.length - 2, 1);
-      onProgress && onProgress(1);
     })().catch((e) => { readyPromise = null; throw e; });
     return readyPromise;
   }
@@ -337,5 +385,5 @@ const OCR = (() => {
     return found;
   }
 
-  return { init, recognize, recognizeRegion, isReady: () => !!rec, FILES };
+  return { init, download, isDownloaded, remove, recognize, recognizeRegion, isReady: () => !!rec, TOTAL, canStore: 'caches' in self };
 })();
