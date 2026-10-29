@@ -331,9 +331,12 @@ function indexProducts(list) {
   for (const p of PRODUCTS) {
     const ik = p.itemNo.toUpperCase();
     p.hasColor = !!p.color && p.color !== '-';
-    const suffix = !p.hasColor && ik.length === 12 && /^[A-Z]{2}$/.test(ik.slice(10)) ? ik.slice(10) : '';
-    p.colorCode = p.hasColor ? p.color.toUpperCase() : suffix;
-    p.base = p.hasColor ? ik : (suffix ? ik.slice(0, 10) : ik);
+    // 품번 형식 두 가지를 같은 "기본 품번(10자리) + 색상 + 사이즈"로 맞춥니다.
+    //  - 4번째 글자 A~F: 품번에 색상까지 포함(SN2F3BS003GR) → 바코드 SN2F3BS003GR-F
+    //  - 4번째 글자 G~ : 품번 10자리(SN2G3BS003) + 색상(GR) + 사이즈(F) → 바코드 SN2G3BS003GRF
+    const tail = ik.length === 12 && /^[A-Z]{2}$/.test(ik.slice(10)) ? ik.slice(10) : '';
+    p.colorCode = p.hasColor ? p.color.toUpperCase() : tail;
+    p.base = tail ? ik.slice(0, 10) : ik;
     const m = [...String(p.name).matchAll(/\(([^()]+)\)/g)].pop();
     p.colorName = m && p.colorCode ? m[1].trim().toUpperCase() : '';
     if (p.colorName) {
@@ -464,7 +467,7 @@ function findBase(tokens) {
     if (c.length < 12) continue;
     for (const L of [10, c.length - 2]) {
       const k = c.slice(0, L);
-      if (L >= 6 && byBase.has(k)) return { key: k, dist: 0, cand: c, suffix: c.slice(L, L + 2) };
+      if (L >= 6 && byBase.has(k)) return { key: k, dist: 0, cand: c, suffix: c.slice(L, L + 2), sizeTail: c.slice(L + 2) };
     }
   }
   const near = new Map();             // 한두 글자 틀린 품번 후보들
@@ -493,18 +496,30 @@ function findColor(text, variants, suffix) {
     if (i + 1 < words.length) phrases.add(words[i] + ' ' + words[i + 1]);
     if (i + 2 < words.length) phrases.add(words[i] + ' ' + words[i + 1] + ' ' + words[i + 2]);
   }
-  let best = null;
+  // 색상마다 가장 잘 맞는 정도(d: 0이면 완전히 같음)를 구합니다.
+  const per = new Map();
+  const consider = (code, d, len, phrase) => {
+    const cur = per.get(code);
+    if (!cur || d < cur.d - 1e-9 || (Math.abs(d - cur.d) < 1e-9 && len > cur.len)) per.set(code, { code, d, len, phrase });
+  };
+  for (const code of colors.keys()) if (words.includes(code)) consider(code, 0.05, code.length, norm(code)); // 색상 코드(BK, WH…)가 따로 읽힘
   for (const [code, name] of colors) for (const alt of [name, ...name.split(/[\/,&+]| - /)]) {
     const target = norm(alt.replace(/[^A-Z0-9]/g, ''));
     if (!target || target.length < 3) continue;
     for (const ph of phrases) {
       const n = norm(ph);
-      let d = n === norm(code) && ph.length === code.length ? 0.05 : weightedDistance(n, target, Math.max(1, 0.3 * target.length)) / target.length;
-      if (d > 0.3) continue;
-      if (!best || d < best.d - 1e-9 || (Math.abs(d - best.d) < 1e-9 && target.length > best.len)) best = { code, d, len: target.length, phrase: n };
+      // 'WHITE/APRICOT'처럼 나눠 본 이름은 전체 이름이 딱 맞는 색상보다 살짝 뒤로
+      const d = weightedDistance(n, target, Math.max(1, 0.3 * target.length)) / target.length + (alt === name ? 0 : 0.01);
+      if (d <= 0.3) consider(code, d, target.length, n);
     }
   }
-  return best;
+  const ranked = [...per.values()].sort((a, b) => a.d - b.d || b.len - a.len);
+  if (!ranked.length) return null;
+  const top = ranked[0];
+  // 같은 이름을 쓰는 색상 코드가 둘 이상이면(예: LB·LL 둘 다 LIGHT BLUE) 정하지 않고 후보로 넘깁니다.
+  const tied = ranked.filter(r => Math.abs(r.d - top.d) < 1e-9 && r.len === top.len);
+  if (tied.length > 1) return { ambiguous: tied.map(r => r.code), phrase: top.phrase };
+  return top;
 }
 
 function findSizes(text, variants) {
@@ -529,12 +544,31 @@ function labelMatch(text, tokens) {
     base = ok[0];
   }
   let vs = byBase.get(base.key) || [];
-  const color = findColor(text, vs, base.suffix);
-  if (color) vs = vs.filter(v => v.colorCode === color.code);
-  const sizes = new Set([...findSizes(text, vs)]);
+  let color = findColor(text, vs, base.suffix);
+  if (color && color.ambiguous) { const set = new Set(color.ambiguous); vs = vs.filter(v => set.has(v.colorCode)); color = null; }
+  else if (color) vs = vs.filter(v => v.colorCode === color.code);
+  // 품번 뒤에 색상·사이즈가 붙어 읽힌 경우(SN2G3BS003GRF, SN2F3BS003GR-F)의 사이즈 부분도 봅니다.
+  const sizeText = text + (base.sizeTail ? '\n' + base.sizeTail.replace(/^5$/, 'S').replace(/^0S$/, 'OS') : '');
+  const sizes = new Set([...findSizes(sizeText, vs)]);
   if (sizes.size === 1) vs = vs.filter(v => v.sizeKey === [...sizes][0]);
   else if (new Set(vs.map(v => v.sizeKey)).size === 1) sizes.add(vs[0].sizeKey);
-  return { base, color, sizes, variants: vs };
+  return { base, color, sizes, variants: dedupeSame(vs) };
+}
+
+// 같은 상품(기본 품번·색상·사이즈가 같음)이 바코드 형식만 다르게 두 번 들어 있으면 하나만 남깁니다.
+// 규칙: 품번 4번째 글자 A~F는 'SN2F3BS003GR-F'(하이픈), G부터는 'SN2G3BS003GRF'(하이픈 없음) 형식을 우선.
+function preferredFormat(p) {
+  const ch = p.base.charAt(3), hy = p.barcode.includes('-');
+  return /[A-F]/.test(ch) ? hy : !hy;
+}
+function dedupeSame(vs) {
+  const groups = new Map();
+  for (const v of vs) {
+    const k = v.base + '|' + v.colorCode + '|' + v.sizeKey;
+    const cur = groups.get(k);
+    if (!cur || (!preferredFormat(cur) && preferredFormat(v))) groups.set(k, v);
+  }
+  return vs.filter(v => groups.get(v.base + '|' + v.colorCode + '|' + v.sizeKey) === v);
 }
 
 // 결과: {type:'exact'|'label'|'learned'|'components'|'fuzzy'|'item'|'none', product, variants, suggestions}
