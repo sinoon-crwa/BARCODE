@@ -652,9 +652,12 @@ class _ScanScreenState extends State<ScanScreen> {
     final name = variant.isEmpty
         ? record.displayName
         : '${record.displayName} ($variant)';
-    return result.merged
+    final head = result.merged
         ? '$name · 수량 ${record.quantity}개'
         : '$name · 목록에 추가';
+    // 상품명 아래에 바코드 전체도 보여줍니다.
+    final barcode = record.product?.barcode ?? '';
+    return barcode.isEmpty ? head : '$head\n바코드: $barcode';
   }
 
   void _closeLastAdded() {
@@ -894,6 +897,7 @@ class _ScanScreenState extends State<ScanScreen> {
               ),
               const SizedBox(height: 8),
               Text('품번: ${product.itemNo}'),
+              Text('바코드: ${product.barcode}'),
               if (product.hasColor) Text('색상: ${product.color}'),
               if (product.sizeLabel.isNotEmpty) Text('사이즈: ${product.sizeLabel}'),
               if (product.price != null) Text('가격: ${product.price}원'),
@@ -968,6 +972,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     (s) => Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
+                        isThreeLine: true,
                         title: Text(
                           s.product.name,
                           maxLines: 2,
@@ -976,8 +981,8 @@ class _ScanScreenState extends State<ScanScreen> {
                         ),
                         subtitle: Text(
                           s.product.variantLabel.isEmpty
-                              ? s.product.itemNo
-                              : '${s.product.itemNo} · ${s.product.variantLabel}',
+                              ? '${s.product.itemNo}\n바코드: ${s.product.barcode}'
+                              : '${s.product.itemNo} · ${s.product.variantLabel}\n바코드: ${s.product.barcode}',
                         ),
                         trailing: const Icon(Icons.add_circle_outline),
                         onTap: () {
@@ -1073,6 +1078,7 @@ class _ScanScreenState extends State<ScanScreen> {
               ),
               const SizedBox(height: 8),
               Text('품번: ${product.itemNo}'),
+              Text('바코드: ${product.barcode}'),
               if (product.hasColor) Text('색상: ${product.color}'),
               if (product.sizeLabel.isNotEmpty) Text('사이즈: ${product.sizeLabel}'),
             ],
@@ -1232,6 +1238,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   for (final p in picks)
                     ListTile(
                       dense: true,
+                      isThreeLine: true,
                       title: Text(
                         p.name,
                         maxLines: 1,
@@ -1240,8 +1247,8 @@ class _ScanScreenState extends State<ScanScreen> {
                       ),
                       subtitle: Text(
                         p.variantLabel.isEmpty
-                            ? p.itemNo
-                            : '${p.itemNo} · ${p.variantLabel}',
+                            ? '${p.itemNo}\n바코드: ${p.barcode}'
+                            : '${p.itemNo} · ${p.variantLabel}\n바코드: ${p.barcode}',
                       ),
                       trailing: Icon(Icons.add_circle, color: scheme.primary),
                       onTap: () => _pickLive(p),
