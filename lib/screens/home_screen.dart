@@ -236,6 +236,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   record.product!.variantLabel,
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
+              if (record.product != null)
+                Text(
+                  '바코드: ${record.product!.barcode}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -683,7 +688,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       subtitle: Text(
         p != null
-            ? '${p.itemNo}${p.variantLabel.isNotEmpty ? ' · ${p.variantLabel}' : ''}\n${r.code}  ·  ${dateFormat.format(r.scannedAt)}'
+            ? '${p.itemNo}${p.variantLabel.isNotEmpty ? ' · ${p.variantLabel}' : ''}\n바코드: ${p.barcode}  ·  ${dateFormat.format(r.scannedAt)}'
             : '${r.code}  ·  ${dateFormat.format(r.scannedAt)}  ·  상품명 미확인',
       ),
       isThreeLine: p != null,
